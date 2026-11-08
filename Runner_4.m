@@ -1377,15 +1377,16 @@ for i=1:SS(2)
             
             Vectors = J.' * Par_Coordinate;
 
-            dTe=(cross(Vectors(:,1),Vectors(:,2)));
-            dTe=dTe/(norm(dTe))^2; 
+            dTe = cross(Vectors(:,1),Vectors(:,2));
             
-            T_surf(1:nn,Scount,SN)=T_surf(1:nn,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*norm(dTe);
+            dA = norm(dTe);
             
-            T_surf_gp(1:nn,gp,i)=Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*norm(dTe);
+            T_surf(1:nn,Scount,SN)=T_surf(1:nn,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
+            
+            T_surf_gp(1:nn,gp,i)=Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
 
 
-            Ke_surf(1:nn,1:nn,e,SN)=Ke_surf(1:nn,1:nn,e,SN)+(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))*Surf_W(gp,Surf,Type(1,e))*norm(dTe);
+            Ke_surf(1:nn,1:nn,e,SN)=Ke_surf(1:nn,1:nn,e,SN)+(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))*Surf_W(gp,Surf,Type(1,e))*dA;
             
             dTea=dTea+dTe;
             
