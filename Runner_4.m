@@ -1375,7 +1375,7 @@ for i=1:SS(2)
                 fprintf(2,'Warning! Mesh is invalid, negative determinant of jacobian on surface detected, Element no=%d, Surface no=%d, Integration point no=%d\n',e,Surf,gp);
             end
             
-            Vectors=inv(J)*Par_Coordinate;
+            Vectors = J.' * Par_Coordinate;
 
             dTe=(cross(Vectors(:,1),Vectors(:,2)));
             dTe=dTe/(norm(dTe))^2; 
