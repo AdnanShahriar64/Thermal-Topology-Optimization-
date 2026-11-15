@@ -5,7 +5,7 @@ Line='--------------------------------------------------------------------------
 % fprintf('%s\n','Calculating Surface Integration parameters');
 % fprintf('%s\n',Line)
 
-% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant') 
+% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant')
 % fprintf('%s\n',Line)
 
 
@@ -28,6 +28,8 @@ T_surf=zeros(Mesh_Information.nnp_max_Model,max(Mesh_Information.nsurf_Model),SN
 Ke_surf=zeros(Mesh_Information.nnp_max_Model,Mesh_Information.nnp_max_Model,Mesh_Information.nel_Model,SNs);
 dTeS=zeros(3,max(Mesh_Information.nsurf_Model),SNs);
 
+ngp_Surf = zeros(1,SS(2));
+
 
 %%
 SNo=0;
@@ -48,44 +50,45 @@ for i=1:SS(2)
 
 
         Surf_gp_for_Surf=Element_Information.Surf_ngp_Elemental(Surf,Type(1,e));
-        
+
 
         Par_Coordinate=Element_Information.Par_Coord_Elemental(:,:,Surf,Type(1,e));
 
-            
+        ngp_Surf(1,i) = Surf_gp_for_Surf;
+
         dTea=[0 0 0]';
         for gp=1:Surf_gp_for_Surf
-           
+
             J=Surf_Dshape(:,1:nn,gp,Surf,Type(1,e))*xyz;
-            
+
             if det(J)<=0
                 fprintf(2,'Warning! Mesh is invalid, negative determinant of jacobian on surface detected, Element no=%d, Surface no=%d, Integration point no=%d\n',e,Surf,gp);
             end
-            
+
             Vectors = J.' * Par_Coordinate;
 
             dTe = cross(Vectors(:,1),Vectors(:,2));
-            
+
             dA = norm(dTe);
-            
+
             T_surf(1:nn,Scount,SN)=T_surf(1:nn,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
-            
+
             T_surf_gp(1:nn,gp,i)=Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
 
 
             Ke_surf(1:nn,1:nn,e,SN)=Ke_surf(1:nn,1:nn,e,SN)+(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))*Surf_W(gp,Surf,Type(1,e))*dA;
-            
+
             dTea=dTea+dTe;
-            
+
             dTeS_gp(:,gp,i)=dTe;
 
             % fprintf('%15d   %15d    %25d   %25f\n',e,SN,gp,det(J))
 
         end
-            
+
         dTeS(:,Scount,SN)=dTea/norm(dTea);
-        
-            
+
+
         %% https://scicomp.stackexchange.com/questions/26886/evaluating-the-surface-integral-in-an-fem-finite-elements-method-procedure
 
         SNo=SN;
@@ -97,7 +100,7 @@ FE_Information_Surface.dTeS_gp=dTeS_gp;
 FE_Information_Surface.dTeS=dTeS;
 FE_Information_Surface.Ke_surf=Ke_surf;
 FE_Information_Surface.T_surf=T_surf;
-
+FE_Information_Surface.ngp_Surf = ngp_Surf;
 
 % fprintf('%s\n\n',Line)
 

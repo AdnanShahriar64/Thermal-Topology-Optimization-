@@ -46,10 +46,10 @@ E_Type={'C3D4','C3D4R','C3D10','C3D10R','C3D6','C3D6R','C3D15','C3D15R','C3D8','
 % Node Import
     fprintf('Importing Nodes...')
     
-    for i=1:length(F_Name)
-        if F_Name(i,1)=='*Node'
+    for i=1:size(F_Name,1)
+        if strcmp(F_Name{i,1},'*Node')
             N_s=i+1;
-        elseif F_Name(i,1)=='*Element'
+        elseif strcmp(F_Name{i,1},'*Element')
             N_e=i-1;
             break
         end
@@ -58,10 +58,10 @@ E_Type={'C3D4','C3D4R','C3D10','C3D10R','C3D6','C3D6R','C3D15','C3D15R','C3D8','
     Nodes=zeros(N_e-N_s,4);
     count=1;
     for i=N_s:N_e
-        Nodes(count,1)=str2num(F_Name(i,1));
-        Nodes(count,2)=str2num(F_Name(i,2));
-        Nodes(count,3)=str2num(F_Name(i,3));
-        Nodes(count,4)=str2num(F_Name(i,4));
+        Nodes(count,1)=str2num(F_Name{i,1});
+        Nodes(count,2)=str2num(F_Name{i,2});
+        Nodes(count,3)=str2num(F_Name{i,3});
+        Nodes(count,4)=str2num(F_Name{i,4});
         count=count+1;
     end
     fprintf('Done\n')
@@ -74,10 +74,10 @@ fprintf('Importing Elements...')
                     %   Element1 end        Element2 end   ...
                     %   Element1 Type       Element2 Type  ...]
     count=1;
-    for i=N_e:length(F_Name)
+    for i=N_e:size(F_Name,1)
         
         % Get E_d
-        if F_Name(i,1)=='*Element'
+        if strcmp(F_Name{i,1},'*Element')
             E_d(1,count)=i+1;
             if count>1
                 E_d(2,count-1)=i-1; 
@@ -85,7 +85,7 @@ fprintf('Importing Elements...')
 
             for eT=1:size(E_Type,2)
                 ET=sprintf('type=%s',E_Type{1,eT});
-                if F_Name(i,2)==ET
+                if strcmp(F_Name{i,2},ET)
                     E_d(3,count)=E_Type{2,eT};
                 end
 
@@ -102,7 +102,7 @@ fprintf('Importing Elements...')
 %             end
 
             count=count+1;
-        elseif F_Name(i,1)=='*Nset' || F_Name(i,1)=='*End Part'
+        elseif strcmp(F_Name{i,1},'*Nset') || strcmp(F_Name{i,1},'*End Part')
             E_d(2,count-1)=i-1;
             break
         end
@@ -126,12 +126,12 @@ fprintf('Importing Elements...')
         
         while i<=E_d(2,eType)
             
-            enum=str2num(F_Name(i,1));
+            enum=str2num(F_Name{i,1});
             
             n=1;
             j=2;
             while n<=nne
-                IEN(n,enum)=str2num(F_Name(i,j));
+                IEN(n,enum)=str2num(F_Name{i,j});
                 j=j+1;
                 n=n+1;
                 if j>16 && nne>16 %E_d(3,eType)>6 
@@ -168,10 +168,10 @@ fprintf('Importing Elements...')
         Sd=sprintf('nset=%s',S_Names{SN});
         St=0;
         En=0;
-        for i=1:length(F_Name)
-            if F_Name(i,2)==Sd
+        for i=1:size(F_Name,1)
+            if strcmp(F_Name{i,2},Sd)
                 St=i+1;
-            elseif F_Name(i,1)=='*Elset' && St>0
+            elseif strcmp(F_Name{i,1},'*Elset') && St>0
                 En=i-1;
                 break
             end
@@ -182,17 +182,17 @@ fprintf('Importing Elements...')
         else
 
                 % Assign Nodes
-                if F_Name(St-1,4)=='generate'
-                    st=str2num(F_Name(St,1));
-                    en=str2num(F_Name(St,2));
-                    ns=[st:str2num(F_Name(St,3)):en];
+                if strcmp(F_Name{St-1,4},'generate')
+                    st=str2num(F_Name{St,1});
+                    en=str2num(F_Name{St,2});
+                    ns=[st:str2num(F_Name{St,3}):en];
                     S_Nodes(1:length(ns),SN)=ns;     
                 else
                     count=1;
                     for i=St:En
                         for j=1:16
-                            if F_Name(i,j)~=""
-                                S_Nodes(count,SN)=str2num(F_Name(i,j));
+                            if ~isempty(F_Name{i,j})
+                                S_Nodes(count,SN)=str2num(F_Name{i,j});
                                 count=count+1;
                             end
                         end
@@ -214,10 +214,10 @@ fprintf('Importing Elements...')
             % Check Start and End
             St=0;
             En=0;
-            for i=1:length(F_Name)
-                if F_Name(i,2)==Sd
+            for i=1:size(F_Name,1)
+                if strcmp(F_Name{i,2},Sd)
                     St=i+1;
-                elseif (F_Name(i,1)=='*Elset' || F_Name(i,1)=='*Nset' || F_Name(i,1)=='*End Assembly' || F_Name(i,1)=='*Surface') && St>0
+                elseif (strcmp(F_Name{i,1},'*Elset') || strcmp(F_Name{i,1},'*Nset') || strcmp(F_Name{i,1},'*End Assembly') || strcmp(F_Name{i,1},'*Surface')) && St>0
                     En=i-1;
                     break
                 end
@@ -229,10 +229,10 @@ fprintf('Importing Elements...')
             else
 
                 % Assign Elements
-                if F_Name(St-1,4)=='generate'
-                    st=str2num(F_Name(St,1));
-                    en=str2num(F_Name(St,2));
-                    ns=[st:str2num(F_Name(St,3)):en];
+                if strcmp(F_Name{St-1,4},'generate')
+                    st=str2num(F_Name{St,1});
+                    en=str2num(F_Name{St,2});
+                    ns=[st:str2num(F_Name{St,3}):en];
                     S_Type_B(count:count+length(ns)-1,2)=ns; 
                     S_Type_B(count:count+length(ns)-1,1)=ns*0+SN;
                     count=count+length(ns);
@@ -240,8 +240,8 @@ fprintf('Importing Elements...')
 
                     for i=St:En
                         for j=1:16
-                            if F_Name(i,j)~=""
-                                S_Type_B(count,2)=str2num(F_Name(i,j));
+                            if ~isempty(F_Name{i,j})
+                                S_Type_B(count,2)=str2num(F_Name{i,j});
                                 S_Type_B(count,1)=SN;
                                 count=count+1;
                             end
@@ -328,10 +328,10 @@ fprintf('Importing Elements...')
         Sd=sprintf('nset=%s',BC_Name{BN});
         St=0;
         En=0;
-        for i=1:length(F_Name)
-            if F_Name(i,2)==Sd
+        for i=1:size(F_Name,1)
+            if strcmp(F_Name{i,2},Sd)
                 St=i+1;
-            elseif (F_Name(i,1)=='*Elset' || F_Name(i,1)=='*Nset') && St>0
+            elseif (strcmp(F_Name{i,1},'*Elset') || strcmp(F_Name{i,1},'*Nset')) && St>0
                 En=i-1;
                 break
             end
@@ -343,17 +343,17 @@ fprintf('Importing Elements...')
             
         
         
-        if F_Name(St-1,4)=='generate' 
-            st=str2num(F_Name(St,1));
-            en=str2num(F_Name(St,2));
-            ns=[st:str2num(F_Name(St,3)):en];
+        if strcmp(F_Name{St-1,4},'generate') 
+            st=str2num(F_Name{St,1});
+            en=str2num(F_Name{St,2});
+            ns=[st:str2num(F_Name{St,3}):en];
             BC_Nodes(1:length(ns),BN)=ns;     
         else        
             count=1;
             for i=St:En
                 for j=1:16
-                    if F_Name(i,j)~=""
-                        BC_Nodes(count,BN)=str2num(F_Name(i,j));
+                    if ~isempty(F_Name{i,j})
+                        BC_Nodes(count,BN)=str2num(F_Name{i,j});
                         count=count+1;
                     end
                 end
@@ -459,10 +459,10 @@ fprintf('Importing Elements...')
         Sd=sprintf('elset=%s',Reg_Name{RN});
         St=0;
         En=0;
-        for i=1:length(F_Name)
-            if F_Name(i,2)==Sd
+        for i=1:size(F_Name,1)
+            if strcmp(F_Name{i,2},Sd)
                 St=i+1;
-            elseif sum(str2num(F_Name(i,1)))==0 && St>0
+            elseif St>0 && sum(str2num(F_Name{i,1}))==0
                 En=i-1;
                 break
             end
@@ -472,17 +472,17 @@ fprintf('Importing Elements...')
        if St==0 && En==0  
        else
         
-            if F_Name(St-1,4)=='generate' 
-                st=str2num(F_Name(St,1));
-                en=str2num(F_Name(St,2));
-                ns=[st:str2num(F_Name(St,3)):en];
+            if strcmp(F_Name{St-1,4},'generate') 
+                st=str2num(F_Name{St,1});
+                en=str2num(F_Name{St,2});
+                ns=[st:str2num(F_Name{St,3}):en];
                 Reg_Elems(1:length(ns),RN)=ns;     
             else        
                 count=1;
                 for i=St:En
                     for j=1:16
-                        if F_Name(i,j)~=""
-                            Reg_Elems(count,RN)=str2num(F_Name(i,j));
+                        if ~isempty(F_Name{i,j})
+                            Reg_Elems(count,RN)=str2num(F_Name{i,j});
                             count=count+1;
                         end
                     end
@@ -504,10 +504,10 @@ fprintf('Importing Elements...')
         Sd2=sprintf('elset=%s',Reg_Name{RN});
         St=0;
         En=0;
-        for i=1:length(F_Name)
-            if F_Name(i,2)==Sd %|| F_Name(i,2)==Sd2
+        for i=1:size(F_Name,1)
+            if strcmp(F_Name{i,2},Sd) %|| F_Name(i,2)==Sd2
                 St=i+1;
-            elseif (F_Name(i,1)=='*Elset' || F_Name(i,1)=='*Nset') && St>0
+            elseif (strcmp(F_Name{i,1},'*Elset') || strcmp(F_Name{i,1},'*Nset')) && St>0
                 En=i-1;
                 break
             end
@@ -521,17 +521,17 @@ fprintf('Importing Elements...')
  
             if St>0
 
-                if F_Name(St-1,4)=='generate' 
-                    st=str2num(F_Name(St,1));
-                    en=str2num(F_Name(St,2));
-                    ns=[st:str2num(F_Name(St,3)):en];
+                if strcmp(F_Name{St-1,4},'generate') 
+                    st=str2num(F_Name{St,1});
+                    en=str2num(F_Name{St,2});
+                    ns=[st:str2num(F_Name{St,3}):en];
                     Reg_Nodes(1:length(ns),RN)=ns;     
                 else        
                     count=1;
                     for i=St:En
                         for j=1:16
-                            if F_Name(i,j)~=""
-                                Reg_Nodes(count,RN)=str2num(F_Name(i,j));
+                            if ~isempty(F_Name{i,j})
+                                Reg_Nodes(count,RN)=str2num(F_Name{i,j});
                                 count=count+1;
                             end
                         end
