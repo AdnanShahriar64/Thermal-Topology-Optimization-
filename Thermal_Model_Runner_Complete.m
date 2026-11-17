@@ -1,27 +1,27 @@
 function[Normal_Vector_form,TimeOut,T_Original,time_Store,T,Error]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha,Maximum_allowed_temperature,T_ground,Check_rate,Time_to_avoid)
 
 
-      [Dm]=Material_Array_Generator_Heat_Transfer(Material_Information);
-    
+    [Dm]=Material_Array_Generator_Heat_Transfer(Material_Information);
+
       % [Dm_Solid]=Material_Array_Generator(Material_Information);
-      
+
 %% System preprocessor
-    
+
     [FE_Information_Region]=Region_Integration_3D_Heat_Transfer(Element_Information,Mesh_Information);
     [FE_Information_Surface]=Surface_Integration_3D_Flux_Thermal(Element_Information,Mesh_Information);
 
     % [FE_Information_Region_Solid]=Region_Integration_3D_Solid(Element_Information,Mesh_Information);
     [FE_Information_Surface_Solid]=Surface_Integration_3D_Pressure_Type_Solid(Element_Information,Mesh_Information);
-    
+
     % [IS_F]=Internal_Stress_to_Nodal_FV(Element_Information,Mesh_Information,FE_Information_Region_Solid,Dm_Solid);
-    
-    % fprintf('Initial System building completed--------------\n')    
-    
-    
+
+    % fprintf('Initial System building completed--------------\n')
+
+
  %%
- 
- %% Mat property and Stiffness    
- 
+
+ %% Mat property and Stiffness
+
 [Ke]=Elemental_Conductivity_Matrix_Generator(Element_Information,Mesh_Information,Material_Information,FE_Information_Region,Dm);
 [Me]=Elemental_Capacitance_Matrix_Generator(Element_Information,Mesh_Information,Material_Information,FE_Information_Region);
 
@@ -33,16 +33,52 @@ Ke_Radiation=epsilon*sigma*(Ke_surf_per_h(:,:,:,1));%+Ke_surf_per_h(:,:,:,2)*0);
 
 Ke_Convection=Ke_surf_per_h(:,:,:,2);
 
-% Assembly    
+% Assembly
     [K] = Assembly(Ke,1,Mesh_Information,Element_Information);
     [M] = Assembly(Me,1,Mesh_Information,Element_Information);
 
-    
+
     % sum(sum(sum(sum(Ke_Radiation))))
-    
+
     [K_Rad] = Assembly(Ke_Radiation,1,Mesh_Information,Element_Information);
 
     [K_Conv] = Assembly(Ke_Convection,1,Mesh_Information,Element_Information);
+
+
+
+
+%% Ground IR and ground-reflected solar (ALBEDO) - PRE-SOLVER ONLY
+% Precompute on exterior surface group 1, reusing GP integration arrays.
+% This block does not modify the %% Solver section or activate these loads.
+Ground_Radiation.Ground_Emissivity = 0.96;  % lunar regolith IR, adjustable
+Ground_Radiation.Ground_Albedo = 0.12;      % diffuse solar reflectance, adjustable
+Ground_Radiation.T_ground_IR = T_ground;   % placeholder; distinct from base BC
+Ground_Radiation.Up_Vector = [0; 0; 1];   % +Z upward after geometry rotation
+Ground_Radiation.Dome_Center = [0; 0; 0]; % origin of the dome's curved shell
+Ground_Radiation.Outer_Surface_Group = 1;
+
+[Ground_Radiation.F_Area, Ground_Radiation.Info] = ...
+    Ground_Radiation_Precompute(Element_Information, Mesh_Information, ...
+    FE_Information_Surface, Ground_Radiation.Outer_Surface_Group, ...
+    Ground_Radiation.Up_Vector, Ground_Radiation.Dome_Center);
+
+% Incoming thermal-IR load [W/node], currently at a constant ground IR T.
+f_ground_IR = Ground_Radiation_IR_Load(Ground_Radiation.F_Area, ...
+    Material_Information.epsilon, Ground_Radiation.Ground_Emissivity, ...
+    Material_Information.StefBC, Ground_Radiation.T_ground_IR);
+
+% ALBEDO depends on the time-varying SF and Sol_Vec, both calculated later
+% in the EXISTING time loop. Store a callable handle without altering it.
+% For future use: f_albedo_now = f_albedo(SF, Sol_Vec);
+f_albedo = @(SF, Sol_Vec) Ground_Radiation_Albedo_Load( ...
+    Ground_Radiation.F_Area, Material_Information.absorbability, ...
+    Ground_Radiation.Ground_Albedo, SF, Sol_Vec, ...
+    Ground_Radiation.Up_Vector);
+
+% Diagnostic: the unit load sums to exterior area weighted by view factor.
+f_ground_area_check = sum(Ground_Radiation.F_Area);
+%% End ground-radiation pre-solver setup
+
 
 
 
@@ -65,32 +101,32 @@ end
 Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 [QS_Unity]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Information,FE_Information_Surface,Nodal_Flux);
 
- 
+
     T_bc=ones(Mesh_Information.nnp_Model,1);
     FTK=zeros(Mesh_Information.nnp_Model,length(Mesh_Information.S_Nodes));
     FTM=FTK;
     Surf_No=3;
     for i=1:length(Mesh_Information.S_Nodes)
-        
+
         Node_No=Mesh_Information.S_Nodes(i,Surf_No);
         if Node_No>0
 
             FTK(:,i)=-K(:,Node_No);
             FTM(:,i)=-M(:,Node_No);
-            
+
             K(:,Node_No)=K(:,Node_No)*0;
             K(Node_No,Node_No)=1;
-            
+
             M(:,Node_No)=M(:,Node_No)*0;
             M(Node_No,Node_No)=1;
 
             K_Rad(:,Node_No)=K_Rad(:,Node_No)*0;
 
             K_Conv(:,Node_No)=K_Conv(:,Node_No)*0;
-        
+
             T_bc(Node_No,1)=0;
         end
-        
+
     end
 
     QS_Unity=QS_Unity.*T_bc;
@@ -111,19 +147,19 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
     FTK_Ones_Unt=FTK*ones(size(FTK,2),1);
     FTK_Ones=FTK_Ones_Unt(1:Ending_range,:);
 
-    
+
     % T_ground=254.8;%Min_T;
-    
+
     Max_T=Maximum_allowed_temperature;%T_ground+50;
     Min_T=T_ground-50;%273-25;
 
-    
+
     T_inner=T_ground;%(Max_T+Min_T)/2; % Min_T;
 
     fgr=FTK_Ones*T_ground;
 
     T=zeros(Mesh_Information.nnp_Model,1)+T_ground;
-    
+
     Got_One=0;
     for i=1:length(Mesh_Information.S_Nodes)
         if Mesh_Information.S_Nodes(i,2)==0
@@ -132,13 +168,13 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         end
     end
     if Got_One==1
-        Inner_Node_count=i-1;    
+        Inner_Node_count=i-1;
     else
         Inner_Node_count=i;
     end
-    
+
     T(Mesh_Information.S_Nodes(1:Inner_Node_count,2))=T_inner;
-    
+
     for i=1:length(Mesh_Information.S_Nodes)
         if Mesh_Information.S_Nodes(i,3)==0
             break
@@ -154,18 +190,18 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
     dt=2;
     count=1;
-    
+
     Time_Range=Initial_Time:dt:Final_Time;
-    
+
     % time_Store=zeros(length(Time_Range),1);
 
     Detect=0;
-    
+
     Error=zeros(length((Mesh_Information.S_Nodes(1:Inner_Node_count,2))),1);
 
     TimeOut=Time_Range(end);
 
-    
+
     T_Original=zeros(length(T),round(length(Time_Range)/(Check_rate)));
     time_Store=zeros(1,round(length(Time_Range)/(Check_rate)));
 
@@ -178,10 +214,10 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
     Mass_air=4/6*pi*2.5^3;
     Heat_transfer_coeff=0;
 
-    
+
 
     % tic
-    for t=Time_Range   
+    for t=Time_Range
 
         %% Input solar flux
 
@@ -198,22 +234,22 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         if sin(beta)<0
             SF=0;
         end
-        
+
 
         for i=1:size(Mesh_Information.S_Nodes,1)
             n=Mesh_Information.S_Nodes(i,Sn);
             if n>0
                 Normal_Component=Normal_Vector_form(3*n-2:3*n);
-        
+
                 Component=Sol_Vec'*-Normal_Component;
-        
-                if Component>0 
+
+                if Component>0
                    Flux(n)=Component*SF;
                 end
             end
         end
-        
-    
+
+
         Flux=Flux.*T_bc;
         Q_SL=QS_Unity.*Flux*Material_Information.absorbability;
 
@@ -227,7 +263,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         frd=-K_Rad_Trun*T_Trun.^4;
 
 %         T_air=T_air+dt/Mass_air*Heat_transfer_coeff*(T_Trun-T_air);
-% 
+%
 %         if mod(t,3600)==0
 %             T_air
 %             pause
@@ -235,13 +271,13 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
 
         % fcon=-Heat_transfer_coeff*K_Conv_Trun*(T_Trun-T_air);
-        
+
         f=fsl+frd+fgr;% fcon;
-        
+
         T_Trun=T_Trun+dt*(In_M*f-In_MK*T_Trun);
 
         T(1:Ending_range)=T_Trun;
-        
+
 
         % norm(T)
 
@@ -257,7 +293,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
             end
 
             time_Store(count)=t;
-            % T_Store(:,count)=T;    
+            % T_Store(:,count)=T;
 
             % SF_Store(count)=SF;
 
@@ -267,7 +303,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
             T_Original(:,count)=T;
             time_Store(count)=t;
-            count=count+1;            
+            count=count+1;
 
             T_bc_added=T.*T_bc;
             T_Inner_Surface=T_bc_added(Mesh_Information.S_Nodes(1:Inner_Node_count,2));
@@ -289,24 +325,24 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 %                         Neg=1;
                      end
                 end
-                
+
             end
             end
-            
-            
+
+
 %             if sum(abs(Error))>1
 %                 Detect=1;
 %             end
-            
+
             if Final_Time<T_One_Lunar_Day_Time*2 && t<Final_Time
                 Detect=0;
             end
-                
+
             % if length(find(abs(Error)>1))==length(Error)
             %    Detect=1;
             % end
-            
-            
+
+
 
         end
 
@@ -315,15 +351,15 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
             TimeOut=t;
             % fprintf('Temperature>Max=%d, Temperature<Min=%d\n',Pos,Neg);
             break
-        end    
-        
-        
+        end
+
+
         % for e=1:nel
-        %    T_e=T(IEN(:,e),1); 
+        %    T_e=T(IEN(:,e),1);
         %    T_Gp(:,e)=Shape(:,1:20,7)*T_e;
         % end
-        
-        
+
+
 
 %         % T_GP_S(:,:,c+1)=T_Gp;
 %         count=count+1;

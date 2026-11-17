@@ -3,7 +3,7 @@ clc
 
 addpath('Element_Library')
 % Assign proper dimension
-    
+
 
     Alpha=0;
 
@@ -46,12 +46,12 @@ addpath('Element_Library')
     DELX=0.001;
 
     LAMDA=0.9;
-    
+
 %% Input FE elements
 
     [Element_Information]=Element_Loader;
 
-%% Material input      
+%% Material input
       Material_Information.MoE=70*10^9;
       Material_Information.PoRat=0.3;
       Material_Information.alpe=10^-6;
@@ -59,21 +59,24 @@ addpath('Element_Library')
       Material_Information.rho=RHO;
       Material_Information.SpcH=SPCH;
       Material_Information.Kx=KX;
-      
+
       Material_Information.epsilon=EPSILON;
       Material_Information.absorbability=ABSORBIBILITY;
 
+      Material_Information.ground_albedo = 0.4;
+      Material_Information.epsilon_gr = 0.85;
 
-      Material_Information.StefBC=5.67*10^-8; 
+
+      Material_Information.StefBC=5.67*10^-8;
 
 
 %% Model Input File
 % Read Abaqus Input file
 
-      Name='SPL_Section_Linear_2.inp';
+      % Name='SPL_Section_Linear_2.inp';
       % Name='SPL_Thermal-Copy-Copy2.inp';
       % Name='SPL_Thermal-Copy-Copy2-Copy.inp';
-      % Name='SPL_Linear_3.inp';
+      Name='SPL_Linear_3.inp';
       S_Names={'S4','S2','S3'};
       % S_Names={'S4'};
       Reg_Name={'Sx','S1'};
@@ -81,10 +84,18 @@ addpath('Element_Library')
 
       [Mesh_Information]=Abaqus_File_Processor_4(Name,S_Names,Reg_Name,BC_Name,Element_Information);
 
+      [Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information);
+      [Dm]=Material_Array_Generator_Heat_Transfer(Material_Information);
 
+      % [Dm_Solid]=Material_Array_Generator(Material_Information);
+
+%% System preprocessor
+
+    [FE_Information_Region]=Region_Integration_3D_Heat_Transfer(Element_Information,Mesh_Information);
+    [FE_Information_Surface]=Surface_Integration_3D_Flux_Thermal(Element_Information,Mesh_Information);
 
 %%
-
+sdsfd
 
     Outer_Radius=Inner_Radius+Intial_thickness;
     Middle_Radius=(Outer_Radius+Inner_Radius)/2;
@@ -92,49 +103,49 @@ addpath('Element_Library')
     In_O_R=2.9;
     In_I_R=2.5;
     In_M_R=2.7;
-    
+
     Nodes=Mesh_Information.Nodes;
 
     try
 
     for i=1:length(Nodes)
-        
+
        if Nodes(i,3)>10^-2
-          Radius=norm(Nodes(i,2:4)); 
+          Radius=norm(Nodes(i,2:4));
            if abs(Radius-In_O_R)<10^-4
                Nodes(i,2:4)=Nodes(i,2:4)/Radius*Outer_Radius;
            elseif abs(Radius-In_I_R)<10^-4
                Nodes(i,2:4)=Nodes(i,2:4)/Radius*Inner_Radius;
            elseif abs(Radius-In_M_R)<10^-4
-               Nodes(i,2:4)=Nodes(i,2:4)/Radius*Middle_Radius;          
+               Nodes(i,2:4)=Nodes(i,2:4)/Radius*Middle_Radius;
            else
                problem
            end
-           
+
        else
-           
+
           Radius=norm(Nodes(i,[2 4]));
-          
+
           Z=abs(Nodes(i,3));
           Zmin=abs(min(Nodes(:,3)));
           Mult=1+Z/Zmin*0;
-          
-          
+
+
            if abs(Radius-In_O_R)<10^-4
                Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Outer_Radius*Mult;
            elseif abs(Radius-In_I_R)<10^-4
                Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Inner_Radius;
            elseif abs(Radius-In_M_R)<10^-4
-               Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Middle_Radius;          
+               Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Middle_Radius;
            else
                problem
-           end   
+           end
 
             Nodes(i,3)=Nodes(i,3)*60;
 
        end
-       
-       
+
+
     end
     Mesh_Information.Nodes=Nodes;
 
@@ -145,29 +156,29 @@ addpath('Element_Library')
      AlphaR=-90*pi/180;
      BetaR=0;
      GammaR=0;
-     
+
      Rz=[cos(GammaR) -sin(GammaR) 0;sin(GammaR) cos(GammaR) 0; 0 0 1];
      Ry=[cos(BetaR) 0 sin(BetaR);0 1 0;-sin(BetaR) 0 cos(BetaR)];
      Rx=[1 0 0; 0 cos(AlphaR) -sin(AlphaR);0 sin(AlphaR) cos(AlphaR)];
      R1=Rx*Ry*Rz;
-     
+
      for i=1:length(Nodes)
          Nodes(i,2:4)=inv(R1)*[Nodes(i,2);Nodes(i,3);Nodes(i,4)];
-     end    
-    
-    
+     end
+
+
     Mesh_Information.Nodes=Nodes;
-   
+
 %% Mesh conversion
 
     [Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information);
     [Mesh_Information]=Element_Converter_8_to_Any(Mesh_Information,Element_Information,10);
     [Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information);
-   
-    
+
+
 %%  Correction for boundary
 
-try 
+try
 
 S_Nodes=Mesh_Information.S_Nodes;
 
@@ -187,17 +198,17 @@ end
 
       %%
       Mesh_Information.Boundary_Cond=[1;1;1];
-    
-    
+
+
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,1)); % Outer layer goes 1st
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,2));
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,3));
-      
+
 
       Mesh_Information.BC_Nodes=Mesh_Information.S_Nodes(:,3);
 
 
-%% Pair selection for boundary      
+%% Pair selection for boundary
   Pair=[0 0];
   count=1;
   for i=1:length(Mesh_Information.S_Nodes(:,1))
@@ -221,12 +232,12 @@ end
 %%
 
 Pair_for_Interpolate=zeros(1,3);
-IEN=Mesh_Information.IEN;  
+IEN=Mesh_Information.IEN;
 count=1;
 for e=1:Mesh_Information.nel_Model
 
     nnp_el=Element_Information.nnp_Elemental(Mesh_Information.Type(1,e));
-     
+
     nn=IEN(05,e);
     if sum(find(Pair_for_Interpolate(:,1)==nn))==0
     Pair_for_Interpolate(count,1:3)=[IEN(05,e) IEN(17,e) IEN(01,e)];
@@ -286,7 +297,7 @@ end
 
 Nodes=Mesh_Information.Nodes;
 for nn=1:length(Pair_for_Interpolate)
-   
+
     nnn=Pair_for_Interpolate(nn,1);
     if Nodes(nnn,4)>-10^-2
 
@@ -294,8 +305,8 @@ for nn=1:length(Pair_for_Interpolate)
         Rad_Org=norm(Nodes(Node_no_upper,2:4));
         Rad_req=Outer_Radius;
         Nodes(Node_no_upper,2:4)=Nodes(Node_no_upper,2:4)*Rad_req/Rad_Org;
-    
-    
+
+
         Node_no_lower=Pair_for_Interpolate(nn,3);
         Rad_Org=norm(Nodes(Node_no_lower,2:4));
         Rad_req=Inner_Radius;
@@ -307,15 +318,15 @@ for nn=1:length(Pair_for_Interpolate)
         Rad_Org=norm(Nodes(Node_no_upper,2:3));
         Rad_req=Outer_Radius;
         Nodes(Node_no_upper,2:3)=Nodes(Node_no_upper,2:3)*Rad_req/Rad_Org;
-    
-    
+
+
         Node_no_lower=Pair_for_Interpolate(nn,3);
         Rad_Org=norm(Nodes(Node_no_lower,2:3));
         Rad_req=Inner_Radius;
         Nodes(Node_no_lower,2:3)=Nodes(Node_no_lower,2:3)*Rad_req/Rad_Org;
     end
-    
-    
+
+
 end
 
 [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
@@ -323,7 +334,7 @@ end
 
 Mesh_Information.Nodes=Nodes;
 
-%% Processing      
+%% Processing
 Nodes=Mesh_Information.Nodes;
 IEN=Mesh_Information.IEN;
 
@@ -336,34 +347,34 @@ for n=1:Mesh_Information.S_Nodes(:,1)
     S_Node_Length=n;
 end
 end
-Node_Update_List=Mesh_Information.S_Nodes(1:S_Node_Length,1); 
+Node_Update_List=Mesh_Information.S_Nodes(1:S_Node_Length,1);
 
 %% Pair for update
 count=1;
 for i=1:length(Mesh_Information.S_Nodes(:,1))
-   
+
     nn=Mesh_Information.S_Nodes(i,1);
 
     if nn>0
-    
+
     x=Nodes(nn,2);
     y=Nodes(nn,3);
-    z=Nodes(nn,4); 
-    
+    z=Nodes(nn,4);
+
     %hold on
     %scatter3(Nodes(nn,2),Nodes(nn,3),Nodes(nn,4),'filled')
-    
+
     if y>10^-3
        for j=1:length(Mesh_Information.S_Nodes(:,1))
-            nn2=Mesh_Information.S_Nodes(j,1); 
+            nn2=Mesh_Information.S_Nodes(j,1);
 
             if nn2>0
                 x2=Nodes(nn2,2);
                 y2=Nodes(nn2,3);
                 z2=Nodes(nn2,4);
-                
+
                 if y2<0
-                    
+
     %                 scatter3(Nodes(nn2,2),Nodes(nn2,3),Nodes(nn2,4),'filled')
     %                 pause
                     if abs(x2-x)<10^-5 && abs(z2-z)<10^-5
@@ -375,18 +386,18 @@ for i=1:length(Mesh_Information.S_Nodes(:,1))
        end
     elseif abs(y)<10^-5
            Node_Update_List2(count,1:2)=[nn 0];
-           count=count+1;    
+           count=count+1;
     end
 
     end
-        
+
 end
-    
+
 Node_Update_List2=sortrows(Node_Update_List2,2);
 
 NC=Nodes(Node_Update_List2(:,1),2:4);
 x=NC(:,1); y=NC(:,2); z=NC(:,3);
-% scatter3(x,y,z)   
+% scatter3(x,y,z)
 
 
 
@@ -425,7 +436,7 @@ Avoid_Timeout=1;
 % load Optimization_10_2_Quadratic_Tmax313_Tmin200_TInt100.mat
 
 % pool = parpool('Threads');
-           
+
 %%
 
 
@@ -462,10 +473,10 @@ Initial_Time=-T_One_Lunar_Day_Time/4;
 T_Initial=zeros(Mesh_Information_Org.neq_Model,1);
 
 % if itertion>1
-% 
+%
 % if max(time_Store)>-Initial_Time
 %     Initial_Time=TimeOut-T_One_Lunar_Day_Time/4;
-%     
+%
 %     Loc=find(time_Store==Initial_Time)
 %     if length(Loc)==0
 %         Loc=find(round(time_Store)==Initial_Time)
@@ -491,14 +502,14 @@ Error_New=norm(Error);
 
 
 % if TimeOut_Old>TimeOut && itertion>2
-% 
+%
 %     Mesh_Information_Org.Nodes=Nodes_Store(:,:,count2-2);
 %     % T=T_Store(:,count2-2);
-% 
+%
 %     TimeOut=TimeOut_Old;
 %     Error=Error_Store(itertion-2);
 %     DelX=DelX/2;
-% 
+%
 % end
 
 % hold on
@@ -506,9 +517,9 @@ Error_New=norm(Error);
 % daspect([1 1 1])
 % scatter3(Nodes(:,2),Nodes(:,3),Nodes(:,4),'filled')
 fprintf('\nIteration=%2d   Error=%6f   Time max=%3d hr   Max temp=%3d(304) Min temp=%3d(229) Check rate=%d Lambda=%f delX=%f\n',itertion,Error_New,TimeOut/(60*60),int16(max(T)),int16(min(T)),Check_rate/(60*60),Lamda,DelX)
-                        
 
-Nodes_Store(:,:,count2)=Mesh_Information_Org.Nodes; 
+
+Nodes_Store(:,:,count2)=Mesh_Information_Org.Nodes;
 Temp_Store(:,count2)=T;
 count2=count2+1;
 
@@ -542,13 +553,13 @@ fprintf("Getting cost function derivetive using Forward difference...")
 parfor (i=1:length(Node_Update_List),4)
 
     if abs(Error(i))>0
-    
+
     Nodes=Nodes_Org;
-    
+
     nn=Node_Update_List(i,1);
-    
+
     if nn>0
-    
+
     Vector=Normal_Vector_form(3*nn-2:3*nn);
     Nodes(nn,2:4)=Nodes(nn,2:4)+Vector'*DelX;
 
@@ -559,18 +570,18 @@ parfor (i=1:length(Node_Update_List),4)
           VectorXY=Vector; VectorXY(3)=0;
           Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)+VectorXY'*DelX;
        end
-    end  
+    end
 
     % Account for middle nodes
     [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
-    
+
     Mesh_Information_Up=Mesh_Information_Org;
     Mesh_Information_Up.Nodes=Nodes;
-    
+
     Mesh_Information_In=Mesh_Information_Up;
-    
+
     % [~,~,~,Error_i]=Thermal_Model_Runner(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Final_Time);
-    
+
     % [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha);
 
     [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha,Maximum_allowed_temperature,T_ground,Check_rate,Time_to_avoid);
@@ -584,23 +595,23 @@ parfor (i=1:length(Node_Update_List),4)
     end
 
     end
-    
+
 end
 
 % fprintf("using Backward difference...")
 % parfor (i=1:length(Node_Update_List),4)
-%     
+%
 %     if abs(Error(i))>0
-% 
+%
 %     Nodes=Nodes_Org;
-%     
+%
 %     nn=Node_Update_List(i,1);
-%     
+%
 %     if nn>0
-%     
+%
 %     Vector=Normal_Vector_form(3*nn-2:3*nn);
 %     Nodes(nn,2:4)=Nodes(nn,2:4)-Vector'*DelX;
-% 
+%
 %     % Account for base
 %     for pp=1:length(Pair)
 %        if Pair(pp,1)==nn
@@ -608,31 +619,31 @@ end
 %           VectorXY=Vector; VectorXY(3)=0;
 %           Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)-VectorXY'*DelX;
 %        end
-%     end  
-% 
+%     end
+%
 %     % Account for middle nodes
 %     [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
-%     
+%
 %     Mesh_Information_Up=Mesh_Information_Org;
 %     Mesh_Information_Up.Nodes=Nodes;
-%     
+%
 %     Mesh_Information_In=Mesh_Information_Up;
-%     
+%
 %     % [~,~,~,Error_i]=Thermal_Model_Runner(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Final_Time);
-%     
+%
 %     % [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha);
-% 
+%
 %     [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha,Maximum_allowed_temperature,T_ground,Check_rate);
-% 
+%
 %     dCost_Func_Backwards(:,i)=Error_i-Error;
-% 
+%
 %     %Cost_Func_i=sum(abs(Error_i));
 %     %dCost_Func_Backwards(i,1)=(Cost_Func_i-Cost_Func);
-% 
+%
 %     end
-% 
+%
 %     end
-%     
+%
 % end
 
 
@@ -658,7 +669,7 @@ end
 % dS=(dCost_Func_Backwards-2*Cost_Func+dCost_Func_Forward)/DelX^2;
 
 N_Move=-inv(dF)*Error*Lamda;
-                    
+
 if max(N_Move)==0
     fprintf('No movement at all! Avoiding this time all together!')
 
@@ -677,17 +688,17 @@ if max(N_Move)>DelX*100
 
     fprintf('Too big movement, %d (m) Correcting!',max(N_Move))
     N_Move=N_Move/max(N_Move)*(DelX*100);
-    
+
 
 end
 
 % N_Move=-(Cost_Func)./(dCost_Func_Forward);
 
 % if max(N_Move)>DelX
-% 
+%
 %     Rat=max(N_Move)/DelX;
 %     N_Move=N_Move/Rat/2;
-% 
+%
 % end
 
 % Update the nodal coordinates------------------------------
@@ -695,25 +706,25 @@ end
 Nodes=Mesh_Information_Org.Nodes;
 
 for i=1:length(Node_Update_List)
-    
+
     nn=Node_Update_List(i,1);
-    
+
     Vector=Normal_Vector_form(3*nn-2:3*nn);
-    
-    if N_Move(i)>0 
+
+    if N_Move(i)>0
     else
 %         if TimeOut<TimeOut_Old
 %         else
             N_Move(i)=N_Move(i)*0.0;
 %        end
     end
-    
+
     Nodes_Cq=Nodes(nn,2:4)+Vector'*N_Move(i);
     % Node_Prev_rad=norm(Mesh_Information.Nodes(nn,2:4));
-    
+
         if norm(Nodes_Cq)>Inner_Radius
             Nodes(nn,2:4)=Nodes(nn,2:4)+Vector'*N_Move(i);
-            
+
             % Account for base
             for pp=1:length(Pair)
                if Pair(pp,1)==nn
@@ -721,8 +732,8 @@ for i=1:length(Node_Update_List)
                   VectorXY=Vector; VectorXY(3)=0;
                   Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)+VectorXY'*N_Move(i);
                end
-            end            
-             
+            end
+
             % Account for middle nodes
             [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
 
@@ -738,7 +749,7 @@ if abs(Error_Previous-Error_New)<10^-10
 
     % Check_rate=Check_rate*2;
     % UpdateCheckRate=0;
-    
+
 %     if Check_rate>40*(60*60)
 %        fprintf ('\nUnable to converge!\n')
 %        TS=itertion;
@@ -780,12 +791,12 @@ try
     % NE_Store(itertion)=NE;
     Time_Store(itertion)=TimeOut;
     Error_Store(itertion)=norm(Error);
-    
+
     NE=Cost_Func;
-    
-    
+
+
     % Nodes_Store(:,itertion)=Nodes;
-    
+
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
@@ -793,7 +804,7 @@ try
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
-   
+
     if mod(itertion,2)==0
         save Optimization_Safety_Even
     else
@@ -849,9 +860,9 @@ elseif AlphaCount==1
     save Data_1_5
 elseif AlphaCount==2
     save Data_2_5
-elseif AlphaCount==3 
+elseif AlphaCount==3
     save Data_3_5
-elseif AlphaCount==4 
+elseif AlphaCount==4
     save Data_4_5
 elseif AlphaCount==5
     save Data_5_5
@@ -900,26 +911,26 @@ function[Normal_Vector_form,TimeOut,T_Original,time_Store,T,Error]=Thermal_Model
 
 
       [Dm]=Material_Array_Generator_Heat_Transfer(Material_Information);
-    
+
       % [Dm_Solid]=Material_Array_Generator(Material_Information);
-      
+
 %% System preprocessor
-    
+
     [FE_Information_Region]=Region_Integration_3D_Heat_Transfer(Element_Information,Mesh_Information);
     [FE_Information_Surface]=Surface_Integration_3D_Flux_Thermal(Element_Information,Mesh_Information);
 
     % [FE_Information_Region_Solid]=Region_Integration_3D_Solid(Element_Information,Mesh_Information);
     [FE_Information_Surface_Solid]=Surface_Integration_3D_Pressure_Type_Solid(Element_Information,Mesh_Information);
-    
+
     % [IS_F]=Internal_Stress_to_Nodal_FV(Element_Information,Mesh_Information,FE_Information_Region_Solid,Dm_Solid);
-    
-    % fprintf('Initial System building completed--------------\n')    
-    
-    
+
+    % fprintf('Initial System building completed--------------\n')
+
+
  %%
- 
- %% Mat property and Stiffness    
- 
+
+ %% Mat property and Stiffness
+
 [Ke]=Elemental_Conductivity_Matrix_Generator(Element_Information,Mesh_Information,Material_Information,FE_Information_Region,Dm);
 [Me]=Elemental_Capacitance_Matrix_Generator(Element_Information,Mesh_Information,Material_Information,FE_Information_Region);
 
@@ -931,13 +942,13 @@ Ke_Radiation=epsilon*sigma*(Ke_surf_per_h(:,:,:,1));%+Ke_surf_per_h(:,:,:,2)*0);
 
 Ke_Convection=Ke_surf_per_h(:,:,:,2);
 
-% Assembly    
+% Assembly
     [K] = Assembly(Ke,1,Mesh_Information,Element_Information);
     [M] = Assembly(Me,1,Mesh_Information,Element_Information);
 
-    
+
     % sum(sum(sum(sum(Ke_Radiation))))
-    
+
     [K_Rad] = Assembly(Ke_Radiation,1,Mesh_Information,Element_Information);
 
     [K_Conv] = Assembly(Ke_Convection,1,Mesh_Information,Element_Information);
@@ -963,32 +974,32 @@ end
 Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 [QS_Unity]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Information,FE_Information_Surface,Nodal_Flux);
 
- 
+
     T_bc=ones(Mesh_Information.nnp_Model,1);
     FTK=zeros(Mesh_Information.nnp_Model,length(Mesh_Information.S_Nodes));
     FTM=FTK;
     Surf_No=3;
     for i=1:length(Mesh_Information.S_Nodes)
-        
+
         Node_No=Mesh_Information.S_Nodes(i,Surf_No);
         if Node_No>0
 
             FTK(:,i)=-K(:,Node_No);
             FTM(:,i)=-M(:,Node_No);
-            
+
             K(:,Node_No)=K(:,Node_No)*0;
             K(Node_No,Node_No)=1;
-            
+
             M(:,Node_No)=M(:,Node_No)*0;
             M(Node_No,Node_No)=1;
 
             K_Rad(:,Node_No)=K_Rad(:,Node_No)*0;
 
             K_Conv(:,Node_No)=K_Conv(:,Node_No)*0;
-        
+
             T_bc(Node_No,1)=0;
         end
-        
+
     end
 
     QS_Unity=QS_Unity.*T_bc;
@@ -1009,19 +1020,19 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
     FTK_Ones_Unt=FTK*ones(size(FTK,2),1);
     FTK_Ones=FTK_Ones_Unt(1:Ending_range,:);
 
-    
+
     % T_ground=254.8;%Min_T;
-    
+
     Max_T=Maximum_allowed_temperature;%T_ground+50;
     Min_T=T_ground-50;%273-25;
 
-    
+
     T_inner=T_ground;%(Max_T+Min_T)/2; % Min_T;
 
     fgr=FTK_Ones*T_ground;
 
     T=zeros(Mesh_Information.nnp_Model,1)+T_ground;
-    
+
     Got_One=0;
     for i=1:length(Mesh_Information.S_Nodes)
         if Mesh_Information.S_Nodes(i,2)==0
@@ -1030,13 +1041,13 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         end
     end
     if Got_One==1
-        Inner_Node_count=i-1;    
+        Inner_Node_count=i-1;
     else
         Inner_Node_count=i;
     end
-    
+
     T(Mesh_Information.S_Nodes(1:Inner_Node_count,2))=T_inner;
-    
+
     for i=1:length(Mesh_Information.S_Nodes)
         if Mesh_Information.S_Nodes(i,3)==0
             break
@@ -1052,18 +1063,18 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
     dt=2;
     count=1;
-    
+
     Time_Range=Initial_Time:dt:Final_Time;
-    
+
     % time_Store=zeros(length(Time_Range),1);
 
     Detect=0;
-    
+
     Error=zeros(length((Mesh_Information.S_Nodes(1:Inner_Node_count,2))),1);
 
     TimeOut=Time_Range(end);
 
-    
+
     T_Original=zeros(length(T),round(length(Time_Range)/(Check_rate)));
     time_Store=zeros(1,round(length(Time_Range)/(Check_rate)));
 
@@ -1076,10 +1087,10 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
     Mass_air=4/6*pi*2.5^3;
     Heat_transfer_coeff=0;
 
-    
+
 
     % tic
-    for t=Time_Range   
+    for t=Time_Range
 
         %% Input solar flux
 
@@ -1096,22 +1107,22 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         if sin(beta)<0
             SF=0;
         end
-        
+
 
         for i=1:size(Mesh_Information.S_Nodes,1)
             n=Mesh_Information.S_Nodes(i,Sn);
             if n>0
                 Normal_Component=Normal_Vector_form(3*n-2:3*n);
-        
+
                 Component=Sol_Vec'*-Normal_Component;
-        
-                if Component>0 
+
+                if Component>0
                    Flux(n)=Component*SF;
                 end
             end
         end
-        
-    
+
+
         Flux=Flux.*T_bc;
         Q_SL=QS_Unity.*Flux*Material_Information.absorbability;
 
@@ -1125,7 +1136,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
         frd=-K_Rad_Trun*T_Trun.^4;
 
 %         T_air=T_air+dt/Mass_air*Heat_transfer_coeff*(T_Trun-T_air);
-% 
+%
 %         if mod(t,3600)==0
 %             T_air
 %             pause
@@ -1133,13 +1144,13 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
 
         % fcon=-Heat_transfer_coeff*K_Conv_Trun*(T_Trun-T_air);
-        
+
         f=fsl+frd+fgr;% fcon;
-        
+
         T_Trun=T_Trun+dt*(In_M*f-In_MK*T_Trun);
 
         T(1:Ending_range)=T_Trun;
-        
+
 
         % norm(T)
 
@@ -1155,7 +1166,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
             end
 
             time_Store(count)=t;
-            % T_Store(:,count)=T;    
+            % T_Store(:,count)=T;
 
             % SF_Store(count)=SF;
 
@@ -1165,7 +1176,7 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 
             T_Original(:,count)=T;
             time_Store(count)=t;
-            count=count+1;            
+            count=count+1;
 
             T_bc_added=T.*T_bc;
             T_Inner_Surface=T_bc_added(Mesh_Information.S_Nodes(1:Inner_Node_count,2));
@@ -1187,24 +1198,24 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
 %                         Neg=1;
                      end
                 end
-                
+
             end
             end
-            
-            
+
+
 %             if sum(abs(Error))>1
 %                 Detect=1;
 %             end
-            
+
             if Final_Time<T_One_Lunar_Day_Time*2 && t<Final_Time
                 Detect=0;
             end
-                
+
             % if length(find(abs(Error)>1))==length(Error)
             %    Detect=1;
             % end
-            
-            
+
+
 
         end
 
@@ -1213,15 +1224,15 @@ Nodal_Flux=Mesh_Information.Nodes(:,1)*0+1;
             TimeOut=t;
             % fprintf('Temperature>Max=%d, Temperature<Min=%d\n',Pos,Neg);
             break
-        end    
-        
-        
+        end
+
+
         % for e=1:nel
-        %    T_e=T(IEN(:,e),1); 
+        %    T_e=T(IEN(:,e),1);
         %    T_Gp(:,e)=Shape(:,1:20,7)*T_e;
         % end
-        
-        
+
+
 
 %         % T_GP_S(:,:,c+1)=T_Gp;
 %         count=count+1;
@@ -1237,7 +1248,7 @@ Line='--------------------------------------------------------------------------
 % fprintf('\n%s\n',Line)
 % fprintf('%s\n','Calculating Region Integration parameters...');
 % fprintf('%s\n',Line)
-% fprintf('%15s   %25s    %25s\n','Element no','Integration point no','Jacobian determinant') 
+% fprintf('%15s   %25s    %25s\n','Element no','Integration point no','Jacobian determinant')
 % fprintf('%s\n',Line)
 
 Nodes=Mesh_Information.Nodes;
@@ -1259,7 +1270,7 @@ nel 	= Mesh_Information.nel_Model;
 
 %% Memory Preallocation
     B=zeros(length(W_Elemental(:,end))*3,Mesh_Information.nnp_max_Model,nel);
-    dJB=zeros(length(W_Elemental(:,end)),nel);    
+    dJB=zeros(length(W_Elemental(:,end)),nel);
 
 %% Each element calculation
 
@@ -1268,7 +1279,7 @@ for e=1:nel
         nn=Element_Information.nnp_Elemental(Type(1,e));                                                         % No of Nodes
         xyz=[Nodes(IEN(1:nn,e),2) Nodes(IEN(1:nn,e),3) Nodes(IEN(1:nn,e),4)];   % Setting up xyz vector
 
-        
+
         for gp=1:Element_Information.ngp_Elemental(Type(1,e))                            % Goes through all Gauss points
                 % Determine B matrix ---------------------------------
                 % Jacobian Matrix
@@ -1287,18 +1298,18 @@ for e=1:nel
                     %                          0       CDsx3(2,k)       0      ;
                     %                          0             0       CDsx3(3,k)];
                     %end
-                    
-                    
+
+
                     if sum(abs(Shape_Elemental(gp,:,Type(1,e))))<10^-3 || dJ<=0 || sum(find(isnan(CDsx3)))>0
                         fprintf(2,'Warning! Weight is set to 0, element no=%d, integration point no=%d\n',e,gp);
                     else
-                    
+
                         B(gp*3-2:gp*3,1:nn,e)=CDsx3;
                         dJB(gp,e)=dJ;
                     end
-                    
+
                    % fprintf('%15d   %25d    %25f\n',e,gp,dJ)
-                    
+
         end
 
 end
@@ -1309,7 +1320,7 @@ FE_Information_Region.dJB=dJB;
 % fprintf('%s\n\n',Line)
 
 end
-        
+
 
 function[FE_Information_Surface]=Surface_Integration_3D_Flux_Thermal(Element_Information,Mesh_Information)
 %%
@@ -1318,7 +1329,7 @@ Line='--------------------------------------------------------------------------
 % fprintf('%s\n','Calculating Surface Integration parameters');
 % fprintf('%s\n',Line)
 
-% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant') 
+% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant')
 % fprintf('%s\n',Line)
 
 
@@ -1361,44 +1372,44 @@ for i=1:SS(2)
 
 
         Surf_gp_for_Surf=Element_Information.Surf_ngp_Elemental(Surf,Type(1,e));
-        
+
 
         Par_Coordinate=Element_Information.Par_Coord_Elemental(:,:,Surf,Type(1,e));
 
-            
+
         dTea=[0 0 0]';
         for gp=1:Surf_gp_for_Surf
-           
+
             J=Surf_Dshape(:,1:nn,gp,Surf,Type(1,e))*xyz;
-            
+
             if det(J)<=0
                 fprintf(2,'Warning! Mesh is invalid, negative determinant of jacobian on surface detected, Element no=%d, Surface no=%d, Integration point no=%d\n',e,Surf,gp);
             end
-            
+
             Vectors = J.' * Par_Coordinate;
 
             dTe = cross(Vectors(:,1),Vectors(:,2));
-            
+
             dA = norm(dTe);
-            
+
             T_surf(1:nn,Scount,SN)=T_surf(1:nn,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
-            
+
             T_surf_gp(1:nn,gp,i)=Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dA;
 
 
             Ke_surf(1:nn,1:nn,e,SN)=Ke_surf(1:nn,1:nn,e,SN)+(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))*Surf_W(gp,Surf,Type(1,e))*dA;
-            
+
             dTea=dTea+dTe;
-            
+
             dTeS_gp(:,gp,i)=dTe;
 
             % fprintf('%15d   %15d    %25d   %25f\n',e,SN,gp,det(J))
 
         end
-            
+
         dTeS(:,Scount,SN)=dTea/norm(dTea);
-        
-            
+
+
         %% https://scicomp.stackexchange.com/questions/26886/evaluating-the-surface-integral-in-an-fem-finite-elements-method-procedure
 
         SNo=SN;
@@ -1426,16 +1437,16 @@ Kx=Material_Information.Kx;
 
 %% Material Matrix initialize
     Dm=zeros(3,3,length(Kx));
-    
+
 %% generate material matrix
 for i=1:length(Kx)
-    
+
 
     Dm=[Kx  0   0
         0   Kx  0
         0   0   Kx];
- 
- 
+
+
 end
 
 %%
@@ -1451,7 +1462,7 @@ function[FE_Information_Surface]=Surface_Integration_3D_Pressure_Type_Solid(Elem
 % fprintf('\n%s\n',Line)
 % fprintf('%s\n','Calculating Surface Integration parameters');
 % fprintf('%s\n',Line)
-% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant') 
+% fprintf('%15s   %15s    %25s   %25s\n','Element no','Local Surface no','Integration point no','Jacobian determinant')
 % fprintf('%s\n',Line)
 
 
@@ -1494,26 +1505,26 @@ for i=1:SS(2)
 
 
         Surf_gp_for_Surf=Element_Information.Surf_ngp_Elemental(Surf,Type(1,e));
-        
+
 
         Par_Coordinate=Element_Information.Par_Coord_Elemental(:,:,Surf,Type(1,e));
 
-            
+
         dTea=[0 0 0]';
         for gp=1:Surf_gp_for_Surf
-           
+
             J=Surf_Dshape(:,1:nn,gp,Surf,Type(1,e))*xyz;
-            
+
             if det(J)<=0
                 fprintf(2,'Warning! Mesh is invalid, negative determinant of jacobian on surface detected, Element no=%d, Surface no=%d, Integration point no=%d\n',e,Surf,gp);
             end
-            
+
             Vectors=(transpose(J))*Par_Coordinate;
 
             dTe=(cross(Vectors(:,1),Vectors(:,2)));
             % dTe=dTe/(norm(dTe))^2;
-            
-            
+
+
             % Valx=Valx+(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))*P;
             % hold on
             % plot(Valx)
@@ -1523,7 +1534,7 @@ for i=1:SS(2)
             % Valz=Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dTe(3);
             % plot(Valx)
             % hold on
-            
+
             P_surf(1:3:nn*ndof-2,Scount,SN)=P_surf(1:3:nn*ndof-2,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dTe(1);
             P_surf(2:3:nn*ndof-1,Scount,SN)=P_surf(2:3:nn*ndof-1,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dTe(2);
             P_surf(3:3:nn*ndof-0,Scount,SN)=P_surf(3:3:nn*ndof-0,Scount,SN)+Surf_W(gp,Surf,Type(1,e))*(Surf_Shape(gp,1:nn,Surf,Type(1,e)))'*dTe(3);
@@ -1535,15 +1546,15 @@ for i=1:SS(2)
             dTeS_gp(:,gp,Scount,SN)=dTe;
 
             dTea=dTea+dTe;
-            
+
             % fprintf('%15d   %15d    %25d   %25f\n',e,SN,gp,det(J))
-            
+
 
         end
-            
+
         dTeS(:,Scount,SN)=dTea/norm(dTea);
-        
-            
+
+
         %% https://scicomp.stackexchange.com/questions/26886/evaluating-the-surface-integral-in-an-fem-finite-elements-method-procedure
 
         SNo=SN;
@@ -1614,7 +1625,7 @@ function[Me,H_Source_per_H]=Elemental_Capacitance_Matrix_Generator(Element_Infor
     ndof=Mesh_Information.ndof_Model;
     neq=Mesh_Information.neq_Model;
     LM=Mesh_Information.LM_Model;
-    
+
     nnp_Max=Mesh_Information.nnp_max_Model;
     ngp_Max=Mesh_Information.ngp_max_Model;
     ngp_Elemental=Element_Information.ngp_Elemental;
@@ -1624,24 +1635,24 @@ function[Me,H_Source_per_H]=Elemental_Capacitance_Matrix_Generator(Element_Infor
     Me=zeros(nnp_Max,nnp_Max,nel);   % Elemental Mass Matrix preallocation
 
     H_Source_per_H=zeros(nnp_Max,nnp_Max,nel);
-    
+
     for e=1:nel
-        
+
         gpLimit=ngp_Elemental(Type(1,e));
         nn=nnp_Elemental(Type(1,e));
 
         for gp=1:gpLimit
-            
+
             N=Shape(gp,1:nn,Type(1,e));
 
             Me(1:nn,1:nn,e)=Me(1:nn,1:nn,e)+SpcH*rho*(N'*N)*dJB(gp,e)*W(gp,Type(1,e));
-            
+
             H_Source_per_H(1:nn,gp,e)=N'*dJB(gp,e)*W(gp,Type(1,e));
-            
+
         end
-        
+
     end
-    
+
 end
 
 function[Ke]=Elemental_Conductivity_Matrix_Generator(Element_Information,Mesh_Information,Material_Information,FE_Information_Region,Dm)
@@ -1667,19 +1678,19 @@ Ke=zeros(nnp_Max*1,nnp_Max*1,nel);   % Elemental Stiffness Matrix preallocation
 
 
 for e=1:nel
-    
+
     gpLimit=ngp_Elemental(Type(1,e));
     nn=nnp_Elemental(Type(1,e));
 
     for gp=1:gpLimit
-        
+
         B_matrix=B(gp*3-2:gp*3,1:nn,e);
-        
+
         Ke(1:nn,1:nn,e)=Ke(1:nn,1:nn,e)+B_matrix'*Dm*B_matrix*dJB(gp,e)*W(gp,Type(1,e));
-      
+
     end
 
-    
+
 end
 
 
@@ -1703,13 +1714,13 @@ function[fS]=Pressure_to_Equivalent_Nodal_Force_Nodal_Pressure_Lag_GL_2(Element_
     for i=1:SS(2) % For each surfaces
 
 
-            SN=Mesh_Information.S_Type(1,i);                            % Extract Surface no 
+            SN=Mesh_Information.S_Type(1,i);                            % Extract Surface no
             if SN>SNO
                 count=1;
             end
 
             Surf_Type=Mesh_Information.S_Type(3,i);
-        
+
             e=Mesh_Information.S_Type(2,i);                         % Extract element no
 
             nn=Element_Information.nnp_Elemental(Mesh_Information.Type(1,e));
@@ -1723,12 +1734,12 @@ function[fS]=Pressure_to_Equivalent_Nodal_Force_Nodal_Pressure_Lag_GL_2(Element_
             % Pes=Ps(i);                                       % Extract Element Pressure
 
             Pes=Nodal_Pressure(Mesh_Information.IEN(1:nn,e));
-            
+
             PesV=zeros(nn*3,1);
             PesV(1:3:end-2)=Pes;
             PesV(2:3:end-1)=Pes;
             PesV(3:3:end-0)=Pes;
-            
+
             fe=FE_Information_Surface.P_surf(1:nn*ndof,count,SN).*PesV;                  % Determine Equivalent Nodal FV
 
             fS(Mesh_Information.LM_Model(1:nn*3,e))=fS(Mesh_Information.LM_Model(1:nn*3,e))+fe;     % Put into Total Force Vector
@@ -1738,12 +1749,12 @@ function[fS]=Pressure_to_Equivalent_Nodal_Force_Nodal_Pressure_Lag_GL_2(Element_
             count=count+1;
 
     end
-   
+
 
 end
-            
 
-      
+
+
 function[QS]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Information,FE_Information_Surface,Nodal_Flux)
 
 %%
@@ -1761,13 +1772,13 @@ function[QS]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Infor
     for i=1:SS(2) % For each surfaces
 
 
-            SN=Mesh_Information.S_Type(1,i);                            % Extract Surface no 
+            SN=Mesh_Information.S_Type(1,i);                            % Extract Surface no
             if SN>SNO
                 count=1;
             end
 
             Surf_Type=Mesh_Information.S_Type(3,i);
-        
+
             e=Mesh_Information.S_Type(2,i);                         % Extract element no
 
             nn=Element_Information.nnp_Elemental(Mesh_Information.Type(1,e));
@@ -1779,12 +1790,12 @@ function[QS]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Infor
             end
 
             % Pes=Ps(i);                                       % Extract Element Pressure
-            
+
             QV=Nodal_Flux(Mesh_Information.IEN(1:nn,e));
 
             % QV=zeros(nn,1);
             % PesV(1:3:end-2)=Q_nn;
-            
+
             Qe=FE_Information_Surface.T_surf(1:nn*ndof,count,SN).*QV;                  % Determine Equivalent Nodal FV
 
             QS(Mesh_Information.IEN(1:nn,e))=QS(Mesh_Information.IEN(1:nn,e))+Qe;     % Put into Total Force Vector
@@ -1794,10 +1805,10 @@ function[QS]=Flux_to_Equivalent_Nodal_Flux_Lag_GL(Element_Information,Mesh_Infor
             count=count+1;
 
     end
-   
+
 
 end
-            
+
 
 function[Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information)
 
@@ -1807,19 +1818,19 @@ Line='----------------------------------------------------';
 % fprintf('%s\n',Line)
 
 
-%% Initialize System  
-    nsd     = 3;                        % number of space dimensions 
+%% Initialize System
+    nsd     = 3;                        % number of space dimensions
     ndof_Model 	= 3;                    % number of degrees-of-freedom per node
-     
+
     nnp_Model 	= Mesh_Information.Nodes(end,1);     	% number of nodal points
     S=size(Mesh_Information.IEN);
     nel_Model 	  = S(2);                 % number of elements
-    neq_Model     = ndof_Model*nnp_Model;             % number of equations    
-    
-%% generate LM array 
+    neq_Model     = ndof_Model*nnp_Model;             % number of equations
+
+%% generate LM array
     LM_Model=zeros(max(Mesh_Information.Type(2,:))*ndof_Model,nel_Model);
     for e = 1:nel_Model
-        
+
         nen=Mesh_Information.Type(2,e)+Mesh_Information.Type(5,e);
 
         for j = 1:nen
@@ -1828,12 +1839,12 @@ Line='----------------------------------------------------';
                  LM_Model(ind,e) = ndof_Model*Mesh_Information.IEN(j,e) - ndof_Model + m;
             end
         end
-    end   
+    end
 
 %% Generate Predefined Model Matrix
     % [IEN_Colm,IEN_Colm2]=Predefined_Matrix_Assembly(nel,Type,IEN);
-    
-    
+
+
 
 
 %% Max properties
@@ -1864,7 +1875,7 @@ for ss=2:size(Mesh_Information.S_Type,2)
         nsurf_Model(1,Mesh_Information.S_Type(ss-1))=ss-s_prev;
         s_prev=ss;
     end
-end    
+end
 if length(nsurf_Model)>1
     nsurf_Model(1,Mesh_Information.S_Type(ss))=ss-s_prev+1;
 end
@@ -1921,12 +1932,12 @@ ElL=length(list);
 for i=1:ElL
     fcnName=list(i).name;
     fcnName=erase(fcnName,'.m');
-    
+
     ElNum=str2num(fcnName(end-1:end));
     if length(ElNum)==0
         ElNum=str2num(fcnName(end));
     end
-    
+
     if ElNum==Type_In
         [INTP,~,W]=eval(fcnName);
         break
@@ -1962,7 +1973,7 @@ for e=1:size(gp_X,2)
             XYZ=[gp_X(gp,e) gp_Y(gp,e) gp_Z(gp,e)];
             Name=c;
             NN(gp,e)=c;
-            
+
             Nodes_New(c,1:4)=[c XYZ];
 
             for e2=1:size(gp_X,2)
@@ -1986,7 +1997,7 @@ end
     Map=Nodes(:,1)*0;
     for i=1:length(Nodes)
         for j=1:length(Nodes_New)
-             if norm(Nodes(i,2:4)-Nodes_New(j,2:4))<10^-10 
+             if norm(Nodes(i,2:4)-Nodes_New(j,2:4))<10^-10
                 Map(i)=j;
              end
         end
@@ -2033,25 +2044,25 @@ S_Nodes_In=zeros(Nodes_New(end,1),max(S_Type(1,:)));
 SN=1;
 s_count=1;
 for ss=1:size(S_Type,2)-1
-    
+
         e=S_Type(2,ss);
         eType=Type_New(1,e);
         snl=S_Type(3,ss);
-        
+
         nsn=Element_Information.Surf_nnp_Elemental(snl,eType);
-        
+
         n_set=Element_Information.Surf_Nodes_Elemental(1:nsn,snl,eType);
-        
+
         Surf_nodes_e=IEN_New(n_set,e);
 
         for i=1:length(Surf_nodes_e)
             Nope=0;
             for j=1:size(S_Nodes_In,1)
-                
+
                 if S_Nodes_In(j,SN)==0
                     break
                 end
-                
+
                 if Surf_nodes_e(i)==S_Nodes_In(j,SN)
                     Nope=1;
                     break
@@ -2061,21 +2072,21 @@ for ss=1:size(S_Type,2)-1
                S_Nodes_In(s_count,SN)=  Surf_nodes_e(i);
                s_count=s_count+1;
             end
-            
+
         end
-        
-    if S_Type(1,ss+1)==S_Type(1,ss)        
-        
+
+    if S_Type(1,ss+1)==S_Type(1,ss)
+
     else
         s_count=1;
         SN=SN+1;
     end
-    
+
 end
 
 
 for i=1:size(S_Nodes_In,1)
-   
+
     if sum(S_Nodes_In(i,:))==0
         Limit=i-1;
         break
@@ -2086,7 +2097,7 @@ S_Nodes_New=S_Nodes_In(1:Limit,:);
 
 
 % S_Nodes_New=S_Nodes;
-% 
+%
 % for Bc=1:size(S_Nodes,2)
 %     for n=1:size(S_Nodes,1)
 %         if BC_Nodes(n,Bc)>0
@@ -2114,18 +2125,18 @@ S_Nodes_New=S_Nodes_In(1:Limit,:);
 %                 IEN_New=NN;
 %                 scatter3(Nodes_New(IEN_New(:,EN),2),Nodes_New(IEN_New(:,EN),3),Nodes_New(IEN_New(:,EN),4))
 %                 daspect([1 1 1])
-%                 
+%
 %                 rotate3d on
 %                 pause
 %                 %%
 %                 for i=1:125
-%                     
+%
 %                     scatter3(Nodes_New(IEN_New(i,EN),2),Nodes_New(IEN_New(i,EN),3),Nodes_New(IEN_New(i,EN),4),'filled')
 %                     pause
-%                 
+%
 %                 end
-%                 
-%                 
+%
+%
 %                 end
 end
 
@@ -2136,8 +2147,8 @@ function[W,shape]=Integration_Points_Data_3D_Brick_Quadratic_07_Local(INTP,W)
 
         nnp=8;
         ngp=size(INTP,1);
-        shape=zeros(ngp,nnp);      
-           
+        shape=zeros(ngp,nnp);
+
     % Generating Shape and dshape matrix
         for i=1:ngp
              x=INTP(i,1);
@@ -2145,9 +2156,9 @@ function[W,shape]=Integration_Points_Data_3D_Brick_Quadratic_07_Local(INTP,W)
              z=INTP(i,3);
              shape(i,1:nnp)=Shape_Functions(x,y,z);
         end
-                                 
-  
-        
+
+
+
 end
 
 function[N]=Shape_Functions(x,y,z)
@@ -2186,26 +2197,26 @@ function[Type,gp_X,gp_Y,gp_Z]=Gauss_Point_Update_locations_3D_L(Nodes,IEN,Type,S
         Type(3,e)=gpn;
 
     end
-  
-    
-%% Get gp locations    
+
+
+%% Get gp locations
 % Memory Preallocation
     gp_X=zeros(max(Type(3,:)),nel);
     gp_Y=gp_X;
     gp_Z=gp_X;
 
-% Each element calculation  
+% Each element calculation
 
 for e=1:nel
 
     nn=Type(2,e); % No of Nodes
     xyz=[Nodes(IEN(1:nn,e),2) Nodes(IEN(1:nn,e),3) Nodes(IEN(1:nn,e),4)];
-    
+
     gp_X(1:Type(3,e),e)=Shape(1:Type(3,e),1:Type(2,e),Type(1,e))*xyz(:,1);
     gp_Y(1:Type(3,e),e)=Shape(1:Type(3,e),1:Type(2,e),Type(1,e))*xyz(:,2);
     gp_Z(1:Type(3,e),e)=Shape(1:Type(3,e),1:Type(2,e),Type(1,e))*xyz(:,3);
-    
-end  
+
+end
 
 
 end
@@ -2230,25 +2241,25 @@ nnp=S(1);
 R_Nodes=Nodes*0;
 count=1;
 for i=1:nnp
-    
+
     if sum(intersect(Nodes(i,1),R_Ns))==0
-        
+
         R_Nodes(count,1:4)=Nodes(i,1:4);
-        
+
         count=count+1;
-        
+
     end
-    
+
 end
 
 Ex_Nn=count-1;  % Max Extempt Node number
 
 for i=1:nnp
     if sum(intersect(Nodes(i,1),R_Ns))>0
-        
+
         R_Nodes(count,1:4)=Nodes(i,1:4);
-        
-        count=count+1; 
+
+        count=count+1;
     end
 end
 
@@ -2259,7 +2270,7 @@ end
 %% Get the Mapping Data     Nodes > R_Nodes
 N_map=zeros(max(Nodes(:,1)),1);
 for i=1:nnp
-   
+
     N_map(R_Nodes(i,1),1)=i;
 
 end
@@ -2274,13 +2285,13 @@ nel=S(2);
 for e=1:nel
 
     for n=1:Element_Information.nnp_Elemental(Type(1,e))
-    
+
         R_IEN(n,e)=N_map(IEN(n,e),1);
-        
+
     end
-    
+
 end
-    
+
 ndof=3;
 
 % Update LM too
@@ -2293,32 +2304,32 @@ ndof=3;
                  LM(ind,e) = ndof*R_IEN(j,e) - ndof + m;
             end
         end
-    end  
-    
-% % Update IEN_Colm too    
+    end
+
+% % Update IEN_Colm too
 %     IEN_Colm=zeros(sum(Type(2,:)),1);
 %     count=1;
 %     for e=1:nel
 %         IEN_Colm(count:count+Type(2,e)-1,1)=IEN(1:Type(2,e),e);
 %         count=count+Type(2,e);
-%     end   
+%     end
 
 
 %% Set up BC and Surface nodes
 R_BC_Nodes=BC_Nodes*0;
 S=size(BC_Nodes);
 for Bn=1:S(2)
-    
+
     for n=1:S(1)
-        
+
         if BC_Nodes(n,Bn)==0
             break
         end
-        
+
         R_BC_Nodes(n,Bn)=N_map(BC_Nodes(n,Bn),1);
-        
+
     end
-    
+
 end
 
 R_S_Nodes=S_Nodes*0;
@@ -2326,21 +2337,21 @@ S=size(S_Nodes);
 for Sn=1:S(2)
 
     for n=1:S(1)
-        
+
         if S_Nodes(n,Sn)==0
             break
         end
-        
+
         R_S_Nodes(n,Sn)=N_map(S_Nodes(n,Sn),1);
-        
+
     end
-    
+
 end
 
 %% Set Up Region Nodes
     R_Reg_Nodes=Reg_Nodes*0;
     S=size(Reg_Nodes);
-    for j=1:S(2) 
+    for j=1:S(2)
         for i=1:S(1)
             if Reg_Nodes(i,j)~=0
 
@@ -2356,12 +2367,12 @@ end
 V_map=zeros(length(N_map)*3,1);
 
 for i=1:length(N_map)
-    
+
    V_map(3*i-2,1)=N_map(i)*3-2;
    V_map(3*i-1,1)=N_map(i)*3-1;
    V_map(3*i,1)=N_map(i)*3;
-    
-end    
+
+end
 
 
 Mesh_Information.Nodes=R_Nodes;
@@ -2376,7 +2387,7 @@ Mesh_Information.LM_Model=LM;
 
 end
 
-            
+
 function[Element_Information,Nodes_Elemental,nnp_Elemental,ngp_Elemental,Intp_Elemental,Shape,DShape,W,Surf_Nodes_Elemental,Surf_Intp_Elemental,Surf_ngp_Elemental,Surf_Shape,Surf_Dshape,Surf_W,Par_Coord]=Element_Loader
 % 1 - Linear Tetra                  - 4 Node
 % 2 - Quadratic Tetra               - 10 Node
@@ -2385,7 +2396,7 @@ function[Element_Information,Nodes_Elemental,nnp_Elemental,ngp_Elemental,Intp_El
 % 5 - Pyramid                       - 18 Node   - 21 GP
 % 6 - Linear Brick                  - 8 Node    - 8  GP
 % 7 - Quadratic Brick               - 20 Node   - 27 GP
-% 8 - Enriched Quadratic Brick      - 27 Node   - 27 GP  
+% 8 - Enriched Quadratic Brick      - 27 Node   - 27 GP
 % 9 - Manual Element 9 Node Brick   - 9 Node    - 8  GP
 
 %% Element Library
@@ -2427,19 +2438,19 @@ Line='--------------------------------------------------------------------------
 fprintf('\n%s\n',Line)
 fprintf('Loading elements:\n')
 fprintf('%s\n',Line)
-fprintf('%60s   %3s     %16s     %19s       %12s       %12s\n','Imported Function Name','DOF','Nodes in Element','Surfaces in Element','Integration points','Element Type') 
+fprintf('%60s   %3s     %16s     %19s       %12s       %12s\n','Imported Function Name','DOF','Nodes in Element','Surfaces in Element','Integration points','Element Type')
 fprintf('%s\n',Line)
 
 cd ..
 
 for i=1:ElL
-   
+
     fcnName=list(i).name;
     fcnName=erase(fcnName,'.m');
-    
+
     %% For Standard FEM
-    if fcnName(end)~='X'  
-        
+    if fcnName(end)~='X'
+
         [NodesO,INTPO,WO,ShapeO,DshapeO,Surf_Nodes_ElementalO,Surf_INTPO,Surf_WO,Surf_ShapeO,Surf_DshapeO,Par_CoordO]=eval(fcnName);
 
         ElNum=str2num(fcnName(end-1:end));
@@ -2463,7 +2474,7 @@ for i=1:ElL
         Nodes_Elemental(1:nnp,:,ElNum)=NodesO;
 
         Intp_Elemental(1:ngp,:,ElNum)=INTPO;
-        
+
         % Surface properties
 %         L=size(Surf_DshapeO);
 %         if length(L)<3
@@ -2502,7 +2513,7 @@ for i=1:ElL
                     Surf_nnp_Elemental(ss,ElNum)=count+1;
                     count=count+1;
                 end
-                
+
             end
         end
         Surf_Nodes_Elemental(1:nnpS,1:sn,ElNum)=Surf_Nodes_ElementalO;
@@ -2512,17 +2523,17 @@ for i=1:ElL
 
         Surf_Dshape(1:ndof,1:nnp,1:maxSgp,1:sn,ElNum)=Surf_DshapeO;
         Surf_Shape(1:maxSgp,1:nnp,1:sn,ElNum)=Surf_ShapeO;
-        
+
         Par_Coord(:,:,1:sn,ElNum)=Par_CoordO;
 
         fprintf('%60s   %3d     %11d     %17d       %15d         %15d\n',fcnName,ndof,nnp,sn,ngp,ElNum)
 
         % Clearing var
         clear WO shapeO DshapeO Surf_WO Surf_ngp_ElementalO Surf_ShapeO Par_CoordO Surf_DshapeO
-    
+
     end
-    
-    
+
+
 end
 
 
@@ -2574,28 +2585,28 @@ E_Type={'C3D4','C3D4R','C3D10','C3D10R','C3D6','C3D6R','C3D15','C3D15R','C3D8','
 % E_Type=[1  2 3  4  5 5  6  8;   % Element Type
 %         3 10 6 15 18 8 20 27;   % Node Number
 %         1  1 6 21 21 8 27 20];  % Gauss Points
-% 
-% % 8 and 20 Node Brick Element Surface Data    
+%
+% % 8 and 20 Node Brick Element Surface Data
 % Surf6=[2     3     6     7  % g=1
 %        1     4     5     8  % g=-1
 %        3     4     7     8  % h=1
 %        1     2     5     6  % h=-1
 %        5     6     7     8  % r=1
-%        1     2     3     4];% r=-1    
-%    
-% % 6 and 15 Node Wedge Element Data   
+%        1     2     3     4];% r=-1
+%
+% % 6 and 15 Node Wedge Element Data
 % Surf3=[9 9 9;9 9 9; 9 9 9; % x, y surface are not incorporated
 %        4 5 6;       % r=1
 %        1 2 3];      % r=-1
-    
 
-   
-% Import    
+
+
+% Import
     F_Name = Importfile(Name);
 
 % Node Import
     fprintf('Importing Nodes...')
-    
+
     for i=1:length(F_Name)
         if F_Name(i,1)=='*Node'
             N_s=i+1;
@@ -2625,12 +2636,12 @@ fprintf('Importing Elements...')
                     %   Element1 Type       Element2 Type  ...]
     count=1;
     for i=N_e:length(F_Name)
-        
+
         % Get E_d
         if F_Name(i,1)=='*Element'
             E_d(1,count)=i+1;
             if count>1
-                E_d(2,count-1)=i-1; 
+                E_d(2,count-1)=i-1;
             end
 
             for eT=1:size(E_Type,2)
@@ -2662,50 +2673,50 @@ fprintf('Importing Elements...')
         fprintf(1,'Most likely element type from Abaqus is unknown')
         error
     end
-    
+
 %%
 
-    % Generate 
+    % Generate
     IEN=0;
     S=size(E_d);
-    
+
     for eType=1:S(2)    % Go through each element types
-       
+
         i=E_d(1,eType);
         nne=Element_Information.nnp_Elemental(E_d(3,eType));
-        
+
         while i<=E_d(2,eType)
-            
+
             enum=str2num(F_Name(i,1));
-            
+
             n=1;
             j=2;
             while n<=nne
                 IEN(n,enum)=str2num(F_Name(i,j));
                 j=j+1;
                 n=n+1;
-                if j>16 && nne>16 %E_d(3,eType)>6 
+                if j>16 && nne>16 %E_d(3,eType)>6
                     j=1;
                     i=i+1;
                 end
             end
-            
+
             Type(1,enum)=E_d(3,eType);
             Type(2,enum)=Element_Information.nnp_Elemental(E_d(3,eType));
             Type(3,enum)=Element_Information.ngp_Elemental(E_d(3,eType));
             Type(4,enum)=1;
             Type(5,enum)=0;
-            
+
             i=i+1;
         end
-        
-        
+
+
     end
     fprintf('Done\n')
 
 
-    
-%% Surface Import   
+
+%% Surface Import
     % Get Surface Nodes
     %fprintf('\n--------------------------------------\n')
     fprintf('Importing surface sets...\n')
@@ -2713,7 +2724,7 @@ fprintf('Importing Elements...')
 
     S_Nodes=0;
     for SN=1:length(S_Names)
-       
+
         % Check Start and End
         Sd=sprintf('nset=%s',S_Names{SN});
         St=0;
@@ -2726,7 +2737,7 @@ fprintf('Importing Elements...')
                 break
             end
         end
-        
+
         if St==0 && En==0
             fprintf(2,'   Warning! Nodes of "%s" surface set can not be detected\n',S_Names{SN});
         else
@@ -2736,7 +2747,7 @@ fprintf('Importing Elements...')
                     st=str2num(F_Name(St,1));
                     en=str2num(F_Name(St,2));
                     ns=[st:str2num(F_Name(St,3)):en];
-                    S_Nodes(1:length(ns),SN)=ns;     
+                    S_Nodes(1:length(ns),SN)=ns;
                 else
                     count=1;
                     for i=St:En
@@ -2747,12 +2758,12 @@ fprintf('Importing Elements...')
                             end
                         end
                     end
-                end  
-                
+                end
+
                 fprintf('   Success! Nodes of "%s" surface set has been detected\n',S_Names{SN});
         end
     end
-        
+
 
         % Get Surface Elements
         count=1;
@@ -2783,7 +2794,7 @@ fprintf('Importing Elements...')
                     st=str2num(F_Name(St,1));
                     en=str2num(F_Name(St,2));
                     ns=[st:str2num(F_Name(St,3)):en];
-                    S_Type_B(count:count+length(ns)-1,2)=ns; 
+                    S_Type_B(count:count+length(ns)-1,2)=ns;
                     S_Type_B(count:count+length(ns)-1,1)=ns*0+SN;
                     count=count+length(ns);
                 else
@@ -2798,20 +2809,20 @@ fprintf('Importing Elements...')
                         end
                     end
 
-                end 
+                end
                 fprintf('   Success! Elements of "%s" surface set has been detected\n',S_Names{SN});
             end
         end
-    
-        
+
+
     %% Hardest Part! Surface type extraction!
     S=size(S_Type_B);
-    
+
     c=1;
     for i=1:S(1)               % For each Element
 
         SN=S_Type_B(i,1);         % Extract Surface Number
-        
+
             % Breaking loop if no surface is detected
             if S_Type_B==0
                 break
@@ -2846,12 +2857,12 @@ fprintf('Importing Elements...')
                         if length(intersect(SNS,L))==SN_Limit
                            S_Type_BU(c,3)=l;
                            S_Type_BU(c,1:2)=S_Type_B(i,1:2);
-      
+
                            cs=cs+1;
                            c=c+1;
                         end
                     end
-                    
+
                 end
 
                 if cs>3
@@ -2874,7 +2885,7 @@ fprintf('Importing Elements...')
     fprintf('Importing Boundary sets...\n')
     %fprintf('--------------------------------------\n')
     for BN=1:length(BC_Name)
-        
+
         Sd=sprintf('nset=%s',BC_Name{BN});
         St=0;
         En=0;
@@ -2886,19 +2897,19 @@ fprintf('Importing Elements...')
                 break
             end
         end
-        
+
         if St==0 && En==0
             fprintf(2,'   Warning! "%s" boundary set can not be detected\n',BC_Name{BN});
         else
-            
-        
-        
-        if F_Name(St-1,4)=='generate' 
+
+
+
+        if F_Name(St-1,4)=='generate'
             st=str2num(F_Name(St,1));
             en=str2num(F_Name(St,2));
             ns=[st:str2num(F_Name(St,3)):en];
-            BC_Nodes(1:length(ns),BN)=ns;     
-        else        
+            BC_Nodes(1:length(ns),BN)=ns;
+        else
             count=1;
             for i=St:En
                 for j=1:16
@@ -2908,59 +2919,59 @@ fprintf('Importing Elements...')
                     end
                 end
             end
-        end  
-        
-        
-        fprintf('   Success! "%s" boundary set has been detected\n',BC_Name{BN});
-        
         end
-        
+
+
+        fprintf('   Success! "%s" boundary set has been detected\n',BC_Name{BN});
+
+        end
+
     end
-    
- Type(end-1,:)=1;   
- Type(end,:)=0;   
-    
+
+ Type(end-1,:)=1;
+ Type(end,:)=0;
+
 %% Material Extract
 
 % for MN=1:length(Mat_Names)
-%     
+%
 %     Sd=sprintf('name=%s',Mat_Names{MN});
-%     
+%
 %     % Get element data
 %     for i=1:length(F_Name)
-% 
+%
 %         if F_Name(i,2)==Sd
 %             rho(MN,1)=str2num(F_Name(i+2,1));
 %             MoE(MN,1)=str2num(F_Name(i+4,1));
 %             PoRat(MN,1)=str2num(F_Name(i+4,2));
 %             break
 %         end
-%         
+%
 %     end
-%     
+%
 %     Sd2=sprintf('material=%s',Mat_Names{MN});
-%     % Update the Type 
+%     % Update the Type
 %     for i=1:length(F_Name)
-% 
+%
 %         % Look for the Section part
 %         if F_Name(i,3)==Sd2
-%             
+%
 %             Elem_search=F_Name(i,2);
-%             
+%
 %             % Look with the element name from Section part
 %             for j=1:length(F_Name)
-%                 
+%
 %                 % Got the part! Now Update Type
 %                 if F_Name(j,1)=='*Elset' && F_Name(j,2)==Elem_search
-%                     
+%
 %                     if F_Name(j,4)=='generate' || F_Name(j,3)=='generate'
-%                        
+%
 %                         EList=[str2num(F_Name(j+1,1)):str2num(F_Name(j+1,3)):str2num(F_Name(j+1,2))];
-%                         
+%
 %                         Type(4,EList)=MN;
-%                         
+%
 %                     else
-%                         
+%
 %                         R_Up=1;
 %                         while R_Up~=0
 %                             for k=1:16
@@ -2969,30 +2980,30 @@ fprintf('Importing Elements...')
 %                                 end
 %                                 EList=str2num(F_Name(j+1,k));
 %                                 Type(4,EList)=MN;
-%                                 
+%
 %                             end
-% 
+%
 %                             j=j+1;
-%                             
+%
 %                             if F_Name(j+1,1)=="*Nset"
 %                                 R_Up=0;
 %                             end
 %                             if F_Name(j+1,1)=="*Elset"
 %                                 R_Up=0;
 %                             end
-%                             
+%
 %                         end
 %                     end
-%                     
+%
 %                     break
 %                 end
-%   
+%
 %             end
 %                break
 %         end
-%         
+%
 %     end
-%           
+%
 % end
 
 
@@ -3002,10 +3013,10 @@ fprintf('Importing Elements...')
     %fprintf('\n--------------------------------------\n')
     fprintf('Importing Region sets...\n')
     %fprintf('--------------------------------------\n')
-    
+
     Reg_Elems=0;
     for RN=1:length(Reg_Name)
-        
+
         Sd=sprintf('elset=%s',Reg_Name{RN});
         St=0;
         En=0;
@@ -3017,17 +3028,17 @@ fprintf('Importing Elements...')
                 break
             end
         end
-        
-        
-       if St==0 && En==0  
+
+
+       if St==0 && En==0
        else
-        
-            if F_Name(St-1,4)=='generate' 
+
+            if F_Name(St-1,4)=='generate'
                 st=str2num(F_Name(St,1));
                 en=str2num(F_Name(St,2));
                 ns=[st:str2num(F_Name(St,3)):en];
-                Reg_Elems(1:length(ns),RN)=ns;     
-            else        
+                Reg_Elems(1:length(ns),RN)=ns;
+            else
                 count=1;
                 for i=St:En
                     for j=1:16
@@ -3037,19 +3048,19 @@ fprintf('Importing Elements...')
                         end
                     end
                 end
-            end  
+            end
        end
-        
-    end
-    
 
-        
+    end
+
+
+
 
 %% Region Node Extract
     c=0;
     Siz=size(Reg_Elems);
     for RN=1:length(Reg_Name)
-        
+
         Sd=sprintf('nset=%s',Reg_Name{RN});
         Sd2=sprintf('elset=%s',Reg_Name{RN});
         St=0;
@@ -3062,21 +3073,21 @@ fprintf('Importing Elements...')
                 break
             end
         end
-        
-        
+
+
         if St==0 && En==0
             fprintf(2,'   Warning! "%s" Region set can not be detected\n',Reg_Name{RN});
             c=c+1;
         else
- 
+
             if St>0
 
-                if F_Name(St-1,4)=='generate' 
+                if F_Name(St-1,4)=='generate'
                     st=str2num(F_Name(St,1));
                     en=str2num(F_Name(St,2));
                     ns=[st:str2num(F_Name(St,3)):en];
-                    Reg_Nodes(1:length(ns),RN)=ns;     
-                else        
+                    Reg_Nodes(1:length(ns),RN)=ns;
+                else
                     count=1;
                     for i=St:En
                         for j=1:16
@@ -3086,21 +3097,21 @@ fprintf('Importing Elements...')
                             end
                         end
                     end
-                end   
+                end
 
             elseif St==0
 
                 Reg_Nodes=0;
                 fprintf(2,'\n     WARNING! No Region Nodes were found! Probably, region has been created using Elements. Generate Externally if you want so much')
-                fprintf('\n')            
+                fprintf('\n')
             end
-            
-            
+
+
             fprintf('   Success! "%s" Region set has been detected\n',Reg_Name{RN});
         end
-        
+
     end
-    
+
     if c==length(Reg_Name)
        Reg_Nodes=0;
     end
@@ -3119,8 +3130,8 @@ fprintf('Importing Elements...')
     % fprintf('\n..Done\n')
     fprintf('------------------------------------------------------\n')
 
-end    
-        
+end
+
 
 
 %% Importing Function
@@ -3213,7 +3224,7 @@ function[gp_X,gp_Y,gp_Z]=Gauss_Point_locations_3D(Element_Information,Mesh_Infor
     IEN=Mesh_Information.IEN;
     Nodes=Mesh_Information.Nodes;
     Shape=Element_Information.Shape_Elemental;
-    
+
     SIEN=size(IEN);
     nel 	= SIEN(2);
 
@@ -3222,18 +3233,18 @@ function[gp_X,gp_Y,gp_Z]=Gauss_Point_locations_3D(Element_Information,Mesh_Infor
     gp_Y=gp_X;
     gp_Z=gp_X;
 
-%% Each element calculation  
+%% Each element calculation
 
 for e=1:nel
 
     nn=nnp_Elemental(Type(1,e)); % No of Nodes
     xyz=[Nodes(IEN(1:nn,e),2) Nodes(IEN(1:nn,e),3) Nodes(IEN(1:nn,e),4)];
-    
+
     gp_X(1:ngp_Elemental(Type(1,e)),e)=Shape(1:ngp_Elemental(Type(1,e)),1:nnp_Elemental(Type(1,e)),Type(1,e))*xyz(:,1);
     gp_Y(1:ngp_Elemental(Type(1,e)),e)=Shape(1:ngp_Elemental(Type(1,e)),1:nnp_Elemental(Type(1,e)),Type(1,e))*xyz(:,2);
     gp_Z(1:ngp_Elemental(Type(1,e)),e)=Shape(1:ngp_Elemental(Type(1,e)),1:nnp_Elemental(Type(1,e)),Type(1,e))*xyz(:,3);
-    
-        
-end  
+
+
+end
 
 end

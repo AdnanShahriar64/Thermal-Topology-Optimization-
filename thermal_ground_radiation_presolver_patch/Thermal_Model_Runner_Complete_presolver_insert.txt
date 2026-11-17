@@ -1,0 +1,31 @@
+%% Ground IR and ground-reflected solar (ALBEDO) - PRE-SOLVER ONLY
+% Precompute on exterior surface group 1, reusing GP integration arrays.
+% This block does not modify the %% Solver section or activate these loads.
+Ground_Radiation.Ground_Emissivity = 0.96;  % lunar regolith IR, adjustable
+Ground_Radiation.Ground_Albedo = 0.12;      % diffuse solar reflectance, adjustable
+Ground_Radiation.T_ground_IR = T_ground;   % placeholder; distinct from base BC
+Ground_Radiation.Up_Vector = [0; 0; 1];   % +Z upward after geometry rotation
+Ground_Radiation.Dome_Center = [0; 0; 0]; % origin of the dome's curved shell
+Ground_Radiation.Outer_Surface_Group = 1;
+
+[Ground_Radiation.F_Area, Ground_Radiation.Info] = ...
+    Ground_Radiation_Precompute(Element_Information, Mesh_Information, ...
+    FE_Information_Surface, Ground_Radiation.Outer_Surface_Group, ...
+    Ground_Radiation.Up_Vector, Ground_Radiation.Dome_Center);
+
+% Incoming thermal-IR load [W/node], currently at a constant ground IR T.
+f_ground_IR = Ground_Radiation_IR_Load(Ground_Radiation.F_Area, ...
+    Material_Information.epsilon, Ground_Radiation.Ground_Emissivity, ...
+    Material_Information.StefBC, Ground_Radiation.T_ground_IR);
+
+% ALBEDO depends on the time-varying SF and Sol_Vec, both calculated later
+% in the EXISTING time loop. Store a callable handle without altering it.
+% For future use: f_albedo_now = f_albedo(SF, Sol_Vec);
+f_albedo = @(SF, Sol_Vec) Ground_Radiation_Albedo_Load( ...
+    Ground_Radiation.F_Area, Material_Information.absorbability, ...
+    Ground_Radiation.Ground_Albedo, SF, Sol_Vec, ...
+    Ground_Radiation.Up_Vector);
+
+% Diagnostic: the unit load sums to exterior area weighted by view factor.
+f_ground_area_check = sum(Ground_Radiation.F_Area);
+%% End ground-radiation pre-solver setup

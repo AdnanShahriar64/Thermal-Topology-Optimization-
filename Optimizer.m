@@ -7,7 +7,7 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
         fullfile(Main_Dir,'System_Preprocessor_Files'), ...
         fullfile(Main_Dir,'Runtime_Calculation_Files'));
 % Assign proper dimension
-    
+
 
     Alpha=0;
 
@@ -50,12 +50,12 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
     DELX=0.001;
 
     LAMDA=0.9;
-    
+
 %% Input FE elements
 
     [Element_Information]=Element_Loader;
 
-%% Material input      
+%% Material input
       Material_Information.MoE=70*10^9;
       Material_Information.PoRat=0.3;
       Material_Information.alpe=10^-6;
@@ -63,12 +63,12 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
       Material_Information.rho=RHO;
       Material_Information.SpcH=SPCH;
       Material_Information.Kx=KX;
-      
+
       Material_Information.epsilon=EPSILON;
       Material_Information.absorbability=ABSORBIBILITY;
 
 
-      Material_Information.StefBC=5.67*10^-8; 
+      Material_Information.StefBC=5.67*10^-8;
 
 
 %% Model Input File
@@ -88,7 +88,7 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
 
 
 %%
-
+sadasd
 
     Outer_Radius=Inner_Radius+Intial_thickness;
     Middle_Radius=(Outer_Radius+Inner_Radius)/2;
@@ -96,49 +96,49 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
     In_O_R=2.9;
     In_I_R=2.5;
     In_M_R=2.7;
-    
+
     Nodes=Mesh_Information.Nodes;
 
     try
 
     for i=1:length(Nodes)
-        
+
        if Nodes(i,3)>10^-2
-          Radius=norm(Nodes(i,2:4)); 
+          Radius=norm(Nodes(i,2:4));
            if abs(Radius-In_O_R)<10^-4
                Nodes(i,2:4)=Nodes(i,2:4)/Radius*Outer_Radius;
            elseif abs(Radius-In_I_R)<10^-4
                Nodes(i,2:4)=Nodes(i,2:4)/Radius*Inner_Radius;
            elseif abs(Radius-In_M_R)<10^-4
-               Nodes(i,2:4)=Nodes(i,2:4)/Radius*Middle_Radius;          
+               Nodes(i,2:4)=Nodes(i,2:4)/Radius*Middle_Radius;
            else
                problem
            end
-           
+
        else
-           
+
           Radius=norm(Nodes(i,[2 4]));
-          
+
           Z=abs(Nodes(i,3));
           Zmin=abs(min(Nodes(:,3)));
           Mult=1+Z/Zmin*0;
-          
-          
+
+
            if abs(Radius-In_O_R)<10^-4
                Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Outer_Radius*Mult;
            elseif abs(Radius-In_I_R)<10^-4
                Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Inner_Radius;
            elseif abs(Radius-In_M_R)<10^-4
-               Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Middle_Radius;          
+               Nodes(i,[2 4])=Nodes(i,[2 4])/Radius*Middle_Radius;
            else
                problem
-           end   
+           end
 
             Nodes(i,3)=Nodes(i,3)*60;
 
        end
-       
-       
+
+
     end
     Mesh_Information.Nodes=Nodes;
 
@@ -149,29 +149,29 @@ addpath(fullfile(Main_Dir,'Element_Library'), ...
      AlphaR=-90*pi/180;
      BetaR=0;
      GammaR=0;
-     
+
      Rz=[cos(GammaR) -sin(GammaR) 0;sin(GammaR) cos(GammaR) 0; 0 0 1];
      Ry=[cos(BetaR) 0 sin(BetaR);0 1 0;-sin(BetaR) 0 cos(BetaR)];
      Rx=[1 0 0; 0 cos(AlphaR) -sin(AlphaR);0 sin(AlphaR) cos(AlphaR)];
      R1=Rx*Ry*Rz;
-     
+
      for i=1:length(Nodes)
          Nodes(i,2:4)=inv(R1)*[Nodes(i,2);Nodes(i,3);Nodes(i,4)];
-     end    
-    
-    
+     end
+
+
     Mesh_Information.Nodes=Nodes;
-   
+
 %% Mesh conversion
 
     [Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information);
     [Mesh_Information]=Element_Converter_8_to_Any(Mesh_Information,Element_Information,10);
     [Mesh_Information]=Geometry_Model_Parameters_Preprocessor_Solid(Mesh_Information,Element_Information);
-   
-    
+
+
 %%  Correction for boundary
 
-try 
+try
 
 S_Nodes=Mesh_Information.S_Nodes;
 
@@ -191,17 +191,17 @@ end
 
       %%
       Mesh_Information.Boundary_Cond=[1;1;1];
-    
-    
+
+
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,1)); % Outer layer goes 1st
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,2));
       [Mesh_Information]=Node_Rearranger(Element_Information,Mesh_Information,Mesh_Information.S_Nodes(:,3));
-      
+
 
       Mesh_Information.BC_Nodes=Mesh_Information.S_Nodes(:,3);
 
 
-%% Pair selection for boundary      
+%% Pair selection for boundary
   Pair=[0 0];
   count=1;
   for i=1:length(Mesh_Information.S_Nodes(:,1))
@@ -225,12 +225,12 @@ end
 %%
 
 Pair_for_Interpolate=zeros(1,3);
-IEN=Mesh_Information.IEN;  
+IEN=Mesh_Information.IEN;
 count=1;
 for e=1:Mesh_Information.nel_Model
 
     nnp_el=Element_Information.nnp_Elemental(Mesh_Information.Type(1,e));
-     
+
     nn=IEN(05,e);
     if sum(find(Pair_for_Interpolate(:,1)==nn))==0
     Pair_for_Interpolate(count,1:3)=[IEN(05,e) IEN(17,e) IEN(01,e)];
@@ -290,7 +290,7 @@ end
 
 Nodes=Mesh_Information.Nodes;
 for nn=1:length(Pair_for_Interpolate)
-   
+
     nnn=Pair_for_Interpolate(nn,1);
     if Nodes(nnn,4)>-10^-2
 
@@ -298,8 +298,8 @@ for nn=1:length(Pair_for_Interpolate)
         Rad_Org=norm(Nodes(Node_no_upper,2:4));
         Rad_req=Outer_Radius;
         Nodes(Node_no_upper,2:4)=Nodes(Node_no_upper,2:4)*Rad_req/Rad_Org;
-    
-    
+
+
         Node_no_lower=Pair_for_Interpolate(nn,3);
         Rad_Org=norm(Nodes(Node_no_lower,2:4));
         Rad_req=Inner_Radius;
@@ -311,15 +311,15 @@ for nn=1:length(Pair_for_Interpolate)
         Rad_Org=norm(Nodes(Node_no_upper,2:3));
         Rad_req=Outer_Radius;
         Nodes(Node_no_upper,2:3)=Nodes(Node_no_upper,2:3)*Rad_req/Rad_Org;
-    
-    
+
+
         Node_no_lower=Pair_for_Interpolate(nn,3);
         Rad_Org=norm(Nodes(Node_no_lower,2:3));
         Rad_req=Inner_Radius;
         Nodes(Node_no_lower,2:3)=Nodes(Node_no_lower,2:3)*Rad_req/Rad_Org;
     end
-    
-    
+
+
 end
 
 [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
@@ -327,7 +327,7 @@ end
 
 Mesh_Information.Nodes=Nodes;
 
-%% Processing      
+%% Processing
 Nodes=Mesh_Information.Nodes;
 IEN=Mesh_Information.IEN;
 
@@ -340,34 +340,34 @@ for n=1:Mesh_Information.S_Nodes(:,1)
     S_Node_Length=n;
 end
 end
-Node_Update_List=Mesh_Information.S_Nodes(1:S_Node_Length,1); 
+Node_Update_List=Mesh_Information.S_Nodes(1:S_Node_Length,1);
 
 %% Pair for update
 count=1;
 for i=1:length(Mesh_Information.S_Nodes(:,1))
-   
+
     nn=Mesh_Information.S_Nodes(i,1);
 
     if nn>0
-    
+
     x=Nodes(nn,2);
     y=Nodes(nn,3);
-    z=Nodes(nn,4); 
-    
+    z=Nodes(nn,4);
+
     %hold on
     %scatter3(Nodes(nn,2),Nodes(nn,3),Nodes(nn,4),'filled')
-    
+
     if y>10^-3
        for j=1:length(Mesh_Information.S_Nodes(:,1))
-            nn2=Mesh_Information.S_Nodes(j,1); 
+            nn2=Mesh_Information.S_Nodes(j,1);
 
             if nn2>0
                 x2=Nodes(nn2,2);
                 y2=Nodes(nn2,3);
                 z2=Nodes(nn2,4);
-                
+
                 if y2<0
-                    
+
     %                 scatter3(Nodes(nn2,2),Nodes(nn2,3),Nodes(nn2,4),'filled')
     %                 pause
                     if abs(x2-x)<10^-5 && abs(z2-z)<10^-5
@@ -379,18 +379,18 @@ for i=1:length(Mesh_Information.S_Nodes(:,1))
        end
     elseif abs(y)<10^-5
            Node_Update_List2(count,1:2)=[nn 0];
-           count=count+1;    
+           count=count+1;
     end
 
     end
-        
+
 end
-    
+
 Node_Update_List2=sortrows(Node_Update_List2,2);
 
 NC=Nodes(Node_Update_List2(:,1),2:4);
 x=NC(:,1); y=NC(:,2); z=NC(:,3);
-% scatter3(x,y,z)   
+% scatter3(x,y,z)
 
 
 
@@ -429,7 +429,7 @@ Avoid_Timeout=1;
 % load Optimization_10_2_Quadratic_Tmax313_Tmin200_TInt100.mat
 
 % pool = parpool('Threads');
-           
+
 %%
 
 
@@ -466,10 +466,10 @@ Initial_Time=-T_One_Lunar_Day_Time/4;
 T_Initial=zeros(Mesh_Information_Org.neq_Model,1);
 
 % if itertion>1
-% 
+%
 % if max(time_Store)>-Initial_Time
 %     Initial_Time=TimeOut-T_One_Lunar_Day_Time/4;
-%     
+%
 %     Loc=find(time_Store==Initial_Time)
 %     if length(Loc)==0
 %         Loc=find(round(time_Store)==Initial_Time)
@@ -495,14 +495,14 @@ Error_New=norm(Error);
 
 
 % if TimeOut_Old>TimeOut && itertion>2
-% 
+%
 %     Mesh_Information_Org.Nodes=Nodes_Store(:,:,count2-2);
 %     % T=T_Store(:,count2-2);
-% 
+%
 %     TimeOut=TimeOut_Old;
 %     Error=Error_Store(itertion-2);
 %     DelX=DelX/2;
-% 
+%
 % end
 
 % hold on
@@ -510,9 +510,9 @@ Error_New=norm(Error);
 % daspect([1 1 1])
 % scatter3(Nodes(:,2),Nodes(:,3),Nodes(:,4),'filled')
 fprintf('\nIteration=%2d   Error=%6f   Time max=%3d hr   Max temp=%3d(304) Min temp=%3d(229) Check rate=%d Lambda=%f delX=%f\n',itertion,Error_New,TimeOut/(60*60),int16(max(T)),int16(min(T)),Check_rate/(60*60),Lamda,DelX)
-                        
 
-Nodes_Store(:,:,count2)=Mesh_Information_Org.Nodes; 
+
+Nodes_Store(:,:,count2)=Mesh_Information_Org.Nodes;
 Temp_Store(:,count2)=T;
 count2=count2+1;
 
@@ -546,13 +546,13 @@ fprintf("Getting cost function derivetive using Forward difference...")
 parfor (i=1:length(Node_Update_List),4)
 
     if abs(Error(i))>0
-    
+
     Nodes=Nodes_Org;
-    
+
     nn=Node_Update_List(i,1);
-    
+
     if nn>0
-    
+
     Vector=Normal_Vector_form(3*nn-2:3*nn);
     Nodes(nn,2:4)=Nodes(nn,2:4)+Vector'*DelX;
 
@@ -563,18 +563,18 @@ parfor (i=1:length(Node_Update_List),4)
           VectorXY=Vector; VectorXY(3)=0;
           Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)+VectorXY'*DelX;
        end
-    end  
+    end
 
     % Account for middle nodes
     [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
-    
+
     Mesh_Information_Up=Mesh_Information_Org;
     Mesh_Information_Up.Nodes=Nodes;
-    
+
     Mesh_Information_In=Mesh_Information_Up;
-    
+
     % [~,~,~,Error_i]=Thermal_Model_Runner(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Final_Time);
-    
+
     % [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha);
 
     [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha,Maximum_allowed_temperature,T_ground,Check_rate,Time_to_avoid);
@@ -588,23 +588,23 @@ parfor (i=1:length(Node_Update_List),4)
     end
 
     end
-    
+
 end
 
 % fprintf("using Backward difference...")
 % parfor (i=1:length(Node_Update_List),4)
-%     
+%
 %     if abs(Error(i))>0
-% 
+%
 %     Nodes=Nodes_Org;
-%     
+%
 %     nn=Node_Update_List(i,1);
-%     
+%
 %     if nn>0
-%     
+%
 %     Vector=Normal_Vector_form(3*nn-2:3*nn);
 %     Nodes(nn,2:4)=Nodes(nn,2:4)-Vector'*DelX;
-% 
+%
 %     % Account for base
 %     for pp=1:length(Pair)
 %        if Pair(pp,1)==nn
@@ -612,31 +612,31 @@ end
 %           VectorXY=Vector; VectorXY(3)=0;
 %           Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)-VectorXY'*DelX;
 %        end
-%     end  
-% 
+%     end
+%
 %     % Account for middle nodes
 %     [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
-%     
+%
 %     Mesh_Information_Up=Mesh_Information_Org;
 %     Mesh_Information_Up.Nodes=Nodes;
-%     
+%
 %     Mesh_Information_In=Mesh_Information_Up;
-%     
+%
 %     % [~,~,~,Error_i]=Thermal_Model_Runner(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Final_Time);
-%     
+%
 %     % [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha);
-% 
+%
 %     [~,~,~,~,T_i,Error_i]=Thermal_Model_Runner_Complete(Element_Information,Mesh_Information_In,Material_Information,T_One_Lunar_Day_Time,Initial_Time,Final_Time,T_Initial,Alpha,Maximum_allowed_temperature,T_ground,Check_rate);
-% 
+%
 %     dCost_Func_Backwards(:,i)=Error_i-Error;
-% 
+%
 %     %Cost_Func_i=sum(abs(Error_i));
 %     %dCost_Func_Backwards(i,1)=(Cost_Func_i-Cost_Func);
-% 
+%
 %     end
-% 
+%
 %     end
-%     
+%
 % end
 
 
@@ -662,7 +662,7 @@ end
 % dS=(dCost_Func_Backwards-2*Cost_Func+dCost_Func_Forward)/DelX^2;
 
 N_Move=-inv(dF)*Error*Lamda;
-                    
+
 if max(N_Move)==0
     fprintf('No movement at all! Avoiding this time all together!')
 
@@ -681,17 +681,17 @@ if max(N_Move)>DelX*100
 
     fprintf('Too big movement, %d (m) Correcting!',max(N_Move))
     N_Move=N_Move/max(N_Move)*(DelX*100);
-    
+
 
 end
 
 % N_Move=-(Cost_Func)./(dCost_Func_Forward);
 
 % if max(N_Move)>DelX
-% 
+%
 %     Rat=max(N_Move)/DelX;
 %     N_Move=N_Move/Rat/2;
-% 
+%
 % end
 
 % Update the nodal coordinates------------------------------
@@ -699,25 +699,25 @@ end
 Nodes=Mesh_Information_Org.Nodes;
 
 for i=1:length(Node_Update_List)
-    
+
     nn=Node_Update_List(i,1);
-    
+
     Vector=Normal_Vector_form(3*nn-2:3*nn);
-    
-    if N_Move(i)>0 
+
+    if N_Move(i)>0
     else
 %         if TimeOut<TimeOut_Old
 %         else
             N_Move(i)=N_Move(i)*0.0;
 %        end
     end
-    
+
     Nodes_Cq=Nodes(nn,2:4)+Vector'*N_Move(i);
     % Node_Prev_rad=norm(Mesh_Information.Nodes(nn,2:4));
-    
+
         if norm(Nodes_Cq)>Inner_Radius
             Nodes(nn,2:4)=Nodes(nn,2:4)+Vector'*N_Move(i);
-            
+
             % Account for base
             for pp=1:length(Pair)
                if Pair(pp,1)==nn
@@ -725,8 +725,8 @@ for i=1:length(Node_Update_List)
                   VectorXY=Vector; VectorXY(3)=0;
                   Nodes(nn_Pair,2:4)=Nodes(nn_Pair,2:4)+VectorXY'*N_Move(i);
                end
-            end            
-             
+            end
+
             % Account for middle nodes
             [Nodes]=Middle_Node_Account(Nodes,Pair_for_Interpolate);
 
@@ -742,7 +742,7 @@ if abs(Error_Previous-Error_New)<10^-10
 
     % Check_rate=Check_rate*2;
     % UpdateCheckRate=0;
-    
+
 %     if Check_rate>40*(60*60)
 %        fprintf ('\nUnable to converge!\n')
 %        TS=itertion;
@@ -784,12 +784,12 @@ try
     % NE_Store(itertion)=NE;
     Time_Store(itertion)=TimeOut;
     Error_Store(itertion)=norm(Error);
-    
+
     NE=Cost_Func;
-    
-    
+
+
     % Nodes_Store(:,itertion)=Nodes;
-    
+
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
@@ -797,7 +797,7 @@ try
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
     % fprintf('--------------------------------------------------------------------------------------------\n')
-   
+
     if mod(itertion,2)==0
         save Optimization_Safety_Even
     else
@@ -853,9 +853,9 @@ elseif AlphaCount==1
     save Data_1_5
 elseif AlphaCount==2
     save Data_2_5
-elseif AlphaCount==3 
+elseif AlphaCount==3
     save Data_3_5
-elseif AlphaCount==4 
+elseif AlphaCount==4
     save Data_4_5
 elseif AlphaCount==5
     save Data_5_5
